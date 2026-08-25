@@ -1,0 +1,14 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: proofcart-backend
+
+groq:
+  api:
+    key: ${GROQ_API_KEY:}
+
+mcp:
+  token:
+    pepper: ${MCP_TOKEN_PEPPER:default-pepper}

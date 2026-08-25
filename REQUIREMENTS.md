@@ -1,11 +1,9 @@
 # ProofCart — Development Requirements
 #
-# IMPORTANT: ProofCart is a Next.js + TypeScript application, not a Python app.
-# Do NOT run: pip install -r requirements.txt
+# IMPORTANT: ProofCart is a Spring Boot (Java) + Angular application.
 #
 # This is an easy-to-read build checklist. Once coding starts, the real
-# JavaScript packages and exact locked versions must be kept in package.json and
-# package-lock.json, then installed with npm install.
+# dependencies must be kept in backend/pom.xml (Maven) and frontend/package.json.
 
 ======================================================================
 1. WHAT WE ARE BUILDING

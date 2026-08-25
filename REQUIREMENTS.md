@@ -88,6 +88,7 @@ Not required:
 - Supabase: PostgreSQL database, Auth, Row Level Security, and migrations.
 - Groq: free-tier AI key for structured intent extraction.
 - Razorpay: Test Mode account and test API keys only.
+- Upstash: free Redis database for short-lived shared catalog caching.
 - Vercel: public Next.js deployment connected to GitHub.
 
 The app must still demonstrate core rule extraction when Groq is unavailable.
@@ -105,6 +106,7 @@ Production dependencies:
 - react-dom                Browser rendering for React.
 - @supabase/supabase-js    Supabase database and Auth client.
 - @supabase/ssr            Secure Supabase sessions in Next.js.
+- @upstash/redis           Server-side Upstash Redis cache client.
 - zod                      Shared validation for forms, APIs, AI, and MCP.
 - groq-sdk                 Groq API client for intent extraction.
 - razorpay                 Razorpay server-side Orders API client.
@@ -147,6 +149,17 @@ or an AI payment-decision framework for v1; they are not needed.
 Install only the shadcn/Radix UI component packages actually used by the UI.
 This keeps the first version small and avoids unused dependencies.
 
+Redis caching rules:
+
+- Cache public merchant details for up to 10 minutes and catalog search/display
+  results for up to 60 seconds.
+- Invalidate affected catalog keys after every merchant product update.
+- Redis is an optimisation only. PostgreSQL remains the source of truth.
+- Never use a Redis value to approve a cart, calculate final checkout amount, or
+  verify price, stock, allergens, delivery, buyer approval, or payment status.
+- If Redis is unavailable, fetch from PostgreSQL; checkout must not fail or
+  become less safe because the cache is down.
+
 ======================================================================
 6. DATABASE REQUIREMENTS
 ======================================================================
@@ -187,6 +200,10 @@ Required database protection:
 [ ] Verify Razorpay browser callback signatures on the server with HMAC-SHA256.
 [ ] Verify Razorpay webhook signatures before processing their data.
 [ ] Store webhook event IDs and ignore duplicate deliveries.
+[ ] Keep Upstash Redis credentials server-side and invalidate catalog cache keys
+    after merchant updates.
+[ ] Re-read PostgreSQL directly for every policy decision and checkout creation;
+    never allow cached product data to authorise payment.
 [ ] Never expose Razorpay Key Secret, webhook secret, Groq key, service-role
     key, or MCP token pepper in browser code or GitHub.
 [ ] MCP tools may search, prepare, and explain a checkout, but must never make
@@ -220,6 +237,8 @@ NEXT_PUBLIC_RAZORPAY_KEY_ID
 RAZORPAY_KEY_SECRET
 RAZORPAY_WEBHOOK_SECRET
 MCP_TOKEN_PEPPER
+UPSTASH_REDIS_REST_URL
+UPSTASH_REDIS_REST_TOKEN
 NEXT_PUBLIC_APP_URL
 
 Only variables beginning with NEXT_PUBLIC_ may be sent to the browser. The
@@ -293,6 +312,8 @@ Unit/API tests:
 - Duplicate checkout and duplicate webhook protection.
 - Role-based access and Row Level Security expectations.
 - MCP token expiry, revocation, and cross-user denial.
+- Redis cache hit, miss, expiry, update invalidation, and PostgreSQL fallback.
+- A proof that checkout policy evaluation bypasses Redis.
 
 Browser tests:
 
@@ -319,6 +340,7 @@ Demo must show:
 [ ] GitHub Actions workflow running lint, type-check, unit tests, and build.
 [ ] Vercel deployment connected to the GitHub repository.
 [ ] Supabase production project configured with production redirect URLs.
+[ ] Upstash Redis environment variables configured only on the server.
 [ ] Razorpay Test Mode webhook configured with the deployed endpoint.
 [ ] docs/MCP_SETUP.md explaining how to connect an MCP client.
 [ ] docs/DEMO_SCRIPT.md containing the five-minute judge demo flow.

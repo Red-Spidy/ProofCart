@@ -61,6 +61,14 @@ Next.js will provide both the web interface and server-side API routes, keeping 
 - `@supabase/ssr` for secure Next.js sessions
 - Zod for shared input and output validation
 
+### Caching
+
+- Upstash Redis free tier as the shared cache, using `@upstash/redis`
+- Cache-aside pattern for catalog browsing and non-sensitive merchant data
+- Short cache time-to-live values and explicit invalidation after a merchant product update
+- Database remains the source of truth; Redis is never used to approve a cart or payment
+- Cache failures fall back to Supabase PostgreSQL instead of blocking a buyer
+
 ### Artificial intelligence
 
 - Groq free tier as the primary AI provider
@@ -231,7 +239,7 @@ Prevents duplicate Razorpay webhook processing.
 
 4. Groq converts the request into structured rules.
 5. The UI shows the extracted rules for buyer confirmation.
-6. ProofCart searches verified merchant products.
+6. ProofCart checks Redis for a recent catalog-search result, then reads the verified merchant catalog from PostgreSQL if there is no safe cache hit.
 7. The policy engine checks the cart.
 8. The buyer sees the product, price, stock, delivery, allergen, return, and subscription information.
 9. The buyer approves the cart.
@@ -247,7 +255,7 @@ Prevents duplicate Razorpay webhook processing.
 1. Merchant creates an account.
 2. Merchant creates a store profile.
 3. Merchant adds NutriBasket products.
-4. Merchant edits product price, stock, ingredients, delivery time, return policy, and subscription availability.
+4. Merchant edits product price, stock, ingredients, delivery time, return policy, and subscription availability. The server updates the product version and invalidates the related Redis catalog cache.
 5. Merchant sees incoming AI shopping requests.
 6. Merchant sees which carts were allowed, blocked, or sent for re-approval.
 7. Merchant can open the audit history for every cart and payment.
@@ -306,6 +314,28 @@ It checks:
 - Merchant ownership.
 - Contract expiration.
 - Product version and offer hash.
+
+### Redis cache rules
+
+Redis makes repeated browsing faster, but it must never affect a money decision.
+
+Safe cache entries:
+
+- Public merchant/store details: up to 10 minutes.
+- Catalog search results and product-list cards: up to 60 seconds.
+- Non-sensitive product display data: up to 60 seconds.
+
+Never read from Redis as the source of truth for:
+
+- A proof-cart snapshot.
+- Final price, stock, allergen, delivery, return, or subscription check.
+- Policy decision.
+- Buyer approval.
+- Razorpay order amount or payment status.
+
+On every product create, edit, stock change, price change, or policy change, the server invalidates that merchant's relevant catalog cache keys. Before a buyer approves a cart and again before a Razorpay order is created, the policy engine reads the current PostgreSQL records directly.
+
+If Redis is unavailable, catalog browsing continues by querying PostgreSQL. Checkout and payment must continue to use PostgreSQL and must not depend on Redis.
 
 ### Decision rules
 
@@ -459,6 +489,9 @@ The repository will include `docs/MCP_SETUP.md` with the remote endpoint and con
 - Never trust product data sent from the browser.
 - Recalculate totals on the server before checkout.
 - Re-check product version before creating a payment.
+- Keep Upstash Redis URL and token server-side; do not cache buyer payment, approval, or personal data.
+- Invalidate affected Redis catalog keys whenever a merchant changes a product.
+- Fall back to PostgreSQL when Redis is unavailable; do not fail or relax a payment check because the cache is down.
 - Never allow an AI tool to bypass buyer approval.
 - Revoke compromised MCP tokens.
 - Keep real credentials out of GitHub.
@@ -472,13 +505,14 @@ The repository will include `docs/MCP_SETUP.md` with the remote endpoint and con
 3. Add buyer and merchant roles.
 4. Add product management.
 5. Add NutriBasket seed data.
-6. Build intent extraction and fallback parser.
-7. Build policy engine.
-8. Build proof-cart review.
-9. Add Razorpay Test Mode checkout.
-10. Add audit receipt.
-11. Add basic remote MCP tools.
-12. Deploy to Vercel.
+6. Connect Upstash Redis and add cache-aside helpers, short TTLs, product-update invalidation, and PostgreSQL fallback.
+7. Build intent extraction and fallback parser.
+8. Build policy engine.
+9. Build proof-cart review.
+10. Add Razorpay Test Mode checkout.
+11. Add audit receipt.
+12. Add basic remote MCP tools.
+13. Deploy to Vercel.
 
 ### Remaining time: quality and testing
 
@@ -506,6 +540,9 @@ The repository will include `docs/MCP_SETUP.md` with the remote endpoint and con
 - Return and subscription checks.
 - Expired intent checks.
 - Changed product version checks.
+- Redis cache hit, cache miss, expiry, and PostgreSQL fallback behavior.
+- Redis invalidation after price, stock, ingredient, delivery, return, or subscription changes.
+- Confirmation that the policy engine and checkout creation bypass Redis.
 
 ### Payment tests
 
@@ -577,6 +614,8 @@ NEXT_PUBLIC_RAZORPAY_KEY_ID
 RAZORPAY_KEY_SECRET
 RAZORPAY_WEBHOOK_SECRET
 MCP_TOKEN_PEPPER
+UPSTASH_REDIS_REST_URL
+UPSTASH_REDIS_REST_TOKEN
 NEXT_PUBLIC_APP_URL
 ```
 
@@ -595,6 +634,7 @@ The project is ready for submission when:
 - Payment signatures and webhooks are verified.
 - Audit receipts explain all important actions.
 - Remote MCP tools work with a scoped token.
+- Redis speeds catalog browsing, invalidates after merchant changes, and has no authority over policy or payment decisions.
 - The application is deployed publicly.
 - The GitHub repository is understandable to a reviewer.
 - The demo shows one successful flow and one safe failure.
@@ -603,6 +643,7 @@ The project is ready for submission when:
 
 - Use Vercel and Supabase for public deployment, authentication, and database.
 - Use Groq free tier with a deterministic fallback.
+- Use Upstash Redis free tier for short-lived catalog caching, with PostgreSQL as the source of truth.
 - Support buyer and merchant roles.
 - Let merchants manage products through a dashboard.
 - Use Razorpay Test Mode only.

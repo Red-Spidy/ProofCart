@@ -14,7 +14,6 @@ import java.util.UUID;
 
 public class ProductEntity {
     @Id
-    @GeneratedValue
     private UUID id;
 
     @Column(name = "merchant_id", nullable = false)
@@ -50,11 +49,11 @@ public class ProductEntity {
     @Column(nullable = false)
     private Integer version;
 
-    @Column(name = "created_at", insertable = false, updatable = false)
-    private Instant createdAt;
+    @Column(name = "created_at", updatable = false)
+    private Instant createdAt = Instant.now();
 
     @Column(name = "updated_at")
-    private Instant updatedAt;
+    private Instant updatedAt = Instant.now();
 
     public ProductEntity() {
     }

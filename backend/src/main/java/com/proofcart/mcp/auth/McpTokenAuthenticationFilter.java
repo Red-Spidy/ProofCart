@@ -22,6 +22,13 @@ public class McpTokenAuthenticationFilter extends OncePerRequestFilter {
     @Value("${mcp.token.pepper:}")
     private String pepper;
 
+    /**
+     * Expected SHA-256 hash of (pepper + ":" + validToken).
+     * Set MCP_VALID_TOKEN_HASH env variable in production.
+     */
+    @Value("${mcp.valid.token.hash:}")
+    private String validTokenHash;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String authHeader = request.getHeader("Authorization");
@@ -29,16 +36,17 @@ public class McpTokenAuthenticationFilter extends OncePerRequestFilter {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String rawToken = authHeader.substring(7);
 
-            // Phase 1: Basic validation logic.
-            // Phase 2 will query Supabase PostgreSQL.
-            if (rawToken.length() > 5) {
-                String tokenHash = hashToken(rawToken);
+            String tokenHash = hashToken(rawToken);
 
-                // For Phase 1, we treat any token >= 5 chars as a valid mock buyer 'buyer-123'
+            // Only authenticate if the hash matches the configured valid token hash
+            if (!validTokenHash.isBlank() && validTokenHash.equals(tokenHash)) {
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        "buyer-123", null, Collections.emptyList());
+                        "mcp-service", null, Collections.emptyList());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+            } else if (validTokenHash.isBlank()) {
+                // No hash configured — log warning but allow in dev mode
+                System.err.println("[McpAuth] WARNING: MCP_VALID_TOKEN_HASH not set. MCP endpoint is UNSECURED.");
             }
         }
 

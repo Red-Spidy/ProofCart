@@ -5,6 +5,39 @@ spring:
   application:
     name: proofcart-backend
 
+  # ─── Database Configuration (Supabase PostgreSQL / fallback to local H2) ─────
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:proofcartdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+
+  # ─── Redis (Cloud Redis / Upstash / local) ──────────────────────────────────
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      username: ${REDIS_USERNAME:default}
+      password: ${REDIS_PASSWORD:}
+      # If Redis is not reachable or empty, CatalogCacheService falls through to Postgres seamlessly
+
+  # ─── CORS for Angular dev server ───────────────────────────────────────────
+  web:
+    cors:
+      allowed-origins: "http://localhost:4200"
+      allowed-methods: "*"
+      allowed-headers: "*"
+
 groq:
   api:
     key: ${GROQ_API_KEY:}
@@ -12,3 +45,10 @@ groq:
 mcp:
   token:
     pepper: ${MCP_TOKEN_PEPPER:default-pepper}
+
+razorpay:
+  key:
+    id: ${RAZORPAY_KEY_ID:}
+    secret: ${RAZORPAY_KEY_SECRET:}
+  webhook:
+    secret: ${RAZORPAY_WEBHOOK_SECRET:}

@@ -45,8 +45,8 @@ public class ProofCartEntity {
     @Column(nullable = false)
     private Boolean approved = false;
 
-    @Column(name = "created_at", insertable = false, updatable = false)
-    private Instant createdAt;
+    @Column(name = "created_at", updatable = false)
+    private Instant createdAt = Instant.now();
 
     public ProofCartEntity() {
     }

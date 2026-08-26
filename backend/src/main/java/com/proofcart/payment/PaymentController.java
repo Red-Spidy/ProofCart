@@ -42,10 +42,12 @@ public class PaymentController {
             options.put("razorpay_payment_id", razorpayPaymentId);
             options.put("razorpay_signature", razorpaySignature);
 
-            boolean isValid = true;
-            if (keySecret != null && !keySecret.isBlank()) {
-                isValid = Utils.verifyPaymentSignature(options, keySecret);
+            if (keySecret == null || keySecret.isBlank()) {
+                return ResponseEntity.status(503).body(
+                        Map.of("error", "Payment verification is not configured. Set RAZORPAY_KEY_SECRET in environment."));
             }
+
+            boolean isValid = Utils.verifyPaymentSignature(options, keySecret);
 
             if (isValid) {
                 order.setRazorpayPaymentId(razorpayPaymentId);
@@ -55,7 +57,7 @@ public class PaymentController {
             } else {
                 order.setStatus("FAILED_VERIFICATION");
                 orderRepo.save(order);
-                return ResponseEntity.badRequest().body(Map.of("error", "Invalid signature"));
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid payment signature. Payment rejected."));
             }
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));

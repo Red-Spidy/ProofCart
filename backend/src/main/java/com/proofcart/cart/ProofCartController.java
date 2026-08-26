@@ -41,7 +41,9 @@ public class ProofCartController {
         // Mock buyer for Phase 2
         UUID buyerId = UUID.fromString("00000000-0000-0000-0000-000000000002");
         UUID merchantId = UUID.fromString(request.get("merchantId").toString());
-        UUID intentId = request.containsKey("intentContractId") ? UUID.fromString(request.get("intentContractId").toString()) : null;
+        Object rawIntentId = request.get("intentContractId");
+        UUID intentId = (rawIntentId != null && !rawIntentId.toString().equals("null") && !rawIntentId.toString().isEmpty())
+                ? UUID.fromString(rawIntentId.toString()) : null;
         List<Map<String, Object>> itemsRaw = (List<Map<String, Object>>) request.get("items");
 
         try {
@@ -55,7 +57,7 @@ public class ProofCartController {
                 expiresAt = intentEntity.getExpiresAt().toString();
             }
 
-            List<ProductEntity> liveProducts = productRepository.findByMerchantId(merchantId);
+            List<ProductEntity> liveProducts = productRepository.findAll();
             Map<UUID, ProductEntity> productMap = new HashMap<>();
             for (ProductEntity p : liveProducts) productMap.put(p.getId(), p);
 
@@ -66,6 +68,9 @@ public class ProofCartController {
                 UUID pId = UUID.fromString(rawItem.get("productId").toString());
                 int qty = (int) rawItem.get("quantity");
                 ProductEntity liveP = productMap.get(pId);
+                if (liveP == null) {
+                    liveP = productRepository.findById(pId).orElse(null);
+                }
                 if (liveP == null) continue;
 
                 ProductSnapshot snap = new ProductSnapshot(
@@ -101,7 +106,8 @@ public class ProofCartController {
             return ResponseEntity.ok(Map.of(
                     "id", saved.getId(),
                     "policyResult", result,
-                    "offerHash", offerHash
+                    "offerHash", offerHash,
+                    "items", cartItems
             ));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));

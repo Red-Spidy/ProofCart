@@ -20,6 +20,8 @@ import com.razorpay.RazorpayClient;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -74,6 +76,12 @@ public class CheckoutController {
             UUID cartId = UUID.fromString(request.get("cartId"));
             ProofCartEntity cart = cartRepo.findById(cartId).orElseThrow();
 
+            // Ownership check: buyer may only checkout their own cart
+            String authenticatedBuyerId = getAuthenticatedBuyerId();
+            if (authenticatedBuyerId != null && !cart.getBuyerId().toString().equals(authenticatedBuyerId)) {
+                return ResponseEntity.status(403).body(Map.of("error", "Access denied: cart belongs to another buyer."));
+            }
+
             if (!cart.getApproved()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Cart not approved by buyer"));
             }
@@ -114,16 +122,16 @@ public class CheckoutController {
                 ));
             }
 
-            // All checks passed again. Create Razorpay order.
-            String rzpOrderId = "order_mock_" + UUID.randomUUID().toString().substring(0, 8);
-            if (razorpayClient != null) {
-                JSONObject orderRequest = new JSONObject();
-                orderRequest.put("amount", cart.getTotalPaise());
-                orderRequest.put("currency", "INR");
-                orderRequest.put("receipt", cart.getId().toString());
-                Order rzpOrder = razorpayClient.orders.create(orderRequest);
-                rzpOrderId = rzpOrder.get("id");
+            // All checks passed. Create Razorpay order.
+            if (razorpayClient == null) {
+                return ResponseEntity.status(503).body(Map.of("error", "Payment gateway not configured. Set RAZORPAY_KEY_ID in environment."));
             }
+            JSONObject orderRequest = new JSONObject();
+            orderRequest.put("amount", cart.getTotalPaise());
+            orderRequest.put("currency", "INR");
+            orderRequest.put("receipt", cart.getId().toString());
+            Order rzpOrder = razorpayClient.orders.create(orderRequest);
+            String rzpOrderId = rzpOrder.get("id");
 
             CheckoutOrderEntity order = new CheckoutOrderEntity();
             order.setBuyerId(cart.getBuyerId());
@@ -143,5 +151,14 @@ public class CheckoutController {
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    private String getAuthenticatedBuyerId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof String principal) {
+            if ("anonymousUser".equals(principal)) return null;
+            return principal;
+        }
+        return null;
     }
 }

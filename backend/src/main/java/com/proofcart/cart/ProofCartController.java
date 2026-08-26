@@ -12,7 +12,10 @@ import com.proofcart.domain.repo.IntentContractRepository;
 import com.proofcart.domain.repo.ProductRepository;
 import com.proofcart.domain.repo.ProofCartRepository;
 import com.proofcart.policy.PolicyEngine;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -36,15 +39,84 @@ public class ProofCartController {
         this.objectMapper = objectMapper;
     }
 
+    // ─── GET /api/proof-carts/{id} ───────────────────────────────────────────
+
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getCart(@PathVariable UUID id) {
+        try {
+            ProofCartEntity cart = proofCartRepository.findById(id).orElseThrow();
+            String buyerId = getAuthenticatedBuyerId();
+
+            // Ownership check
+            if (buyerId != null && !cart.getBuyerId().toString().equals(buyerId)) {
+                return ResponseEntity.status(403).body(Map.of("error", "Access denied."));
+            }
+
+            List<CartItem> items = objectMapper.readValue(cart.getSnapshotDataJson(),
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, CartItem.class));
+            List<?> policyChecks = objectMapper.readValue(cart.getPolicyChecksJson(), List.class);
+
+            Map<String, Object> policyResult = new LinkedHashMap<>();
+            policyResult.put("decision", cart.getPolicyDecision());
+            policyResult.put("checks", policyChecks);
+
+            return ResponseEntity.ok(Map.of(
+                    "id", cart.getId(),
+                    "policyResult", policyResult,
+                    "offerHash", cart.getOfferHash(),
+                    "items", items
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(404).body(Map.of("error", "Cart not found"));
+        }
+    }
+
+    // ─── POST /api/proof-carts ───────────────────────────────────────────────
+
     @PostMapping
     public ResponseEntity<?> createProofCart(@RequestBody Map<String, Object> request) {
-        // Mock buyer for Phase 2
-        UUID buyerId = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        // Resolve buyer identity from authenticated context (set by BuyerAuthFilter)
+        String buyerIdStr = getAuthenticatedBuyerId();
+        if (buyerIdStr == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Missing or invalid X-Buyer-Id header."));
+        }
+        UUID buyerId = UUID.fromString(buyerIdStr);
         UUID merchantId = UUID.fromString(request.get("merchantId").toString());
         Object rawIntentId = request.get("intentContractId");
         UUID intentId = (rawIntentId != null && !rawIntentId.toString().equals("null") && !rawIntentId.toString().isEmpty())
                 ? UUID.fromString(rawIntentId.toString()) : null;
+
+        @SuppressWarnings("unchecked")
         List<Map<String, Object>> itemsRaw = (List<Map<String, Object>>) request.get("items");
+
+        // ── Input validation ─────────────────────────────────────────────────
+        if (itemsRaw == null || itemsRaw.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Cart must contain at least one item."));
+        }
+
+        Set<String> seenProductIds = new HashSet<>();
+        for (Map<String, Object> rawItem : itemsRaw) {
+            String pid = rawItem.get("productId") != null ? rawItem.get("productId").toString() : null;
+            if (pid == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Each item must have a productId."));
+            }
+            if (!seenProductIds.add(pid)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Duplicate productId: " + pid));
+            }
+            Object qtyObj = rawItem.get("quantity");
+            if (qtyObj == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Each item must have a quantity."));
+            }
+            int qty;
+            try {
+                qty = ((Number) qtyObj).intValue();
+            } catch (ClassCastException e) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Quantity must be a number."));
+            }
+            if (qty <= 0) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Quantity must be a positive integer. Got: " + qty));
+            }
+        }
 
         try {
             IntentContractEntity intentEntity = null;
@@ -66,7 +138,7 @@ public class ProofCartController {
 
             for (Map<String, Object> rawItem : itemsRaw) {
                 UUID pId = UUID.fromString(rawItem.get("productId").toString());
-                int qty = (int) rawItem.get("quantity");
+                int qty = ((Number) rawItem.get("quantity")).intValue();
                 ProductEntity liveP = productMap.get(pId);
                 if (liveP == null) {
                     liveP = productRepository.findById(pId).orElse(null);
@@ -114,14 +186,35 @@ public class ProofCartController {
         }
     }
 
+    // ─── POST /api/proof-carts/{id}/approve ─────────────────────────────────
+
     @PostMapping("/{id}/approve")
     public ResponseEntity<?> approveCart(@PathVariable UUID id) {
         ProofCartEntity cart = proofCartRepository.findById(id).orElseThrow();
+
+        // Ownership check
+        String buyerId = getAuthenticatedBuyerId();
+        if (buyerId != null && !cart.getBuyerId().toString().equals(buyerId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied: cart belongs to another buyer."));
+        }
+
         if (!"ALLOWED".equals(cart.getPolicyDecision())) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Cart is not ALLOWED"));
+            return ResponseEntity.badRequest().body(Map.of("error", "Cart is not ALLOWED by the policy engine."));
         }
         cart.setApproved(true);
         proofCartRepository.save(cart);
         return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    private String getAuthenticatedBuyerId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof String principal) {
+            // Reject Spring's default "anonymousUser" principal
+            if ("anonymousUser".equals(principal)) return null;
+            return principal;
+        }
+        return null;
     }
 }

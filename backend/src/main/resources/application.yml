@@ -52,3 +52,11 @@ razorpay:
     secret: ${RAZORPAY_KEY_SECRET:}
   webhook:
     secret: ${RAZORPAY_WEBHOOK_SECRET:}
+
+supabase:
+  url: ${SUPABASE_URL:https://fqrdwzzyzckinlkryand.supabase.co}
+  anon-key: ${SUPABASE_ANON_KEY:}
+  jwt:
+    secret: ${SUPABASE_JWT_SECRET:}
+    issuer: ${SUPABASE_URL:https://fqrdwzzyzckinlkryand.supabase.co}/auth/v1
+    audience: authenticated

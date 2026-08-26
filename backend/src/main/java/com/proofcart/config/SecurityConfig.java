@@ -1,6 +1,7 @@
 package com.proofcart.config;
 
 import com.proofcart.mcp.auth.McpTokenAuthenticationFilter;
+import com.proofcart.security.SupabaseJwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -15,12 +16,13 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableWebSecurity
 public class SecurityConfig {
 
+    private final SupabaseJwtAuthenticationFilter supabaseJwtFilter;
     private final McpTokenAuthenticationFilter mcpTokenAuthenticationFilter;
-    private final BuyerAuthFilter buyerAuthFilter;
 
-    public SecurityConfig(McpTokenAuthenticationFilter mcpTokenAuthenticationFilter, BuyerAuthFilter buyerAuthFilter) {
+    public SecurityConfig(SupabaseJwtAuthenticationFilter supabaseJwtFilter,
+                          McpTokenAuthenticationFilter mcpTokenAuthenticationFilter) {
+        this.supabaseJwtFilter = supabaseJwtFilter;
         this.mcpTokenAuthenticationFilter = mcpTokenAuthenticationFilter;
-        this.buyerAuthFilter = buyerAuthFilter;
     }
 
     @Bean
@@ -32,7 +34,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Public: H2 console (dev only)
                         .requestMatchers("/h2-console/**").permitAll()
-                        // Public: Catalog lookup (frontend needs this on page load)
+                        // Public: Catalog lookup (no login required to browse products)
                         .requestMatchers("/api/catalog/**").permitAll()
                         // Public: Intent parsing (entry point of the flow)
                         .requestMatchers("/api/intents/**").permitAll()
@@ -40,10 +42,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/webhooks/**").permitAll()
                         // MCP: authenticated only
                         .requestMatchers("/api/mcp").authenticated()
-                        // Everything else (carts, checkout, payments, audit) requires auth
+                        // Everything else (carts, checkout, payments, audit) requires Supabase JWT
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(buyerAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                // Run Supabase JWT filter first, then MCP token filter
+                .addFilterBefore(supabaseJwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(mcpTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

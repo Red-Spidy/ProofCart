@@ -18,19 +18,29 @@ import java.util.UUID;
 public class CatalogController {
 
     private final ProductRepository productRepository;
+    private final CatalogService catalogService;
 
-    public CatalogController(ProductRepository productRepository) {
+    public CatalogController(ProductRepository productRepository, CatalogService catalogService) {
         this.productRepository = productRepository;
+        this.catalogService = catalogService;
     }
 
     @GetMapping("/{merchantId}")
-    public ResponseEntity<?> getCatalog(@PathVariable String merchantId) {
+    public ResponseEntity<?> getCatalog(@PathVariable String merchantId, @RequestParam(required = false) String q) {
         try {
             UUID mid = UUID.fromString(merchantId);
-            List<ProductEntity> products = productRepository.findByMerchantId(mid);
+            List<ProductEntity> products;
+            
+            if (q != null && !q.isBlank()) {
+                // If there's a search query, fetch from Open Food Facts & sync to DB
+                products = catalogService.searchAndSyncCatalog(q);
+            } else {
+                // Default: get local seeded products
+                products = productRepository.findByMerchantId(mid);
+            }
 
             if (products.isEmpty()) {
-                return ResponseEntity.ok(Map.of("products", List.of(), "message", "No products found for merchant " + merchantId));
+                return ResponseEntity.ok(Map.of("products", List.of(), "message", "No products found"));
             }
 
             List<Map<String, Object>> result = products.stream().map(p -> {

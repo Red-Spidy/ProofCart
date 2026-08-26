@@ -1,4 +1,4 @@
-import {Component} from '@angular/core';
+import {Component, OnInit} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
 import {Router} from '@angular/router';
@@ -337,68 +337,39 @@ import {ProductCardComponent} from '../../components/product-card/product-card';
     }
   `]
 })
-export class HomeComponent {
+export class HomeComponent implements OnInit {
   prompt = '';
   loading = false;
   loadingStep = '';
   stepsDone = 0;
   intent: IntentExtraction | null = null;
   errorMessage = '';
+  catalogLoading = true;
 
-  // Full catalog — the AI will filter this based on parsed rules
-  catalog = [
-    {
-      id: '00000000-0000-0000-0000-000000000001',
-      name: 'Vegan Trail Mix',
-      description: 'A premium blend of nuts, seeds & dried fruits. Peanut-free and gluten-free.',
-      pricePaise: 84000,
-      dietaryTags: ['vegan', 'gluten-free'],
-      allergens: [],
-      deliveryDays: 0
-    },
-    {
-      id: '00000000-0000-0000-0000-000000000002',
-      name: 'Keto Protein Bars',
-      description: 'High protein, low carb bars with peanut butter and dark chocolate.',
-      pricePaise: 120000,
-      dietaryTags: ['keto'],
-      allergens: ['peanuts'],
-      deliveryDays: 1
-    },
-    {
-      id: '00000000-0000-0000-0000-000000000003',
-      name: 'Organic Fruit Bites',
-      description: 'Sweet organic fruit snacks. No added sugar or artificial colors.',
-      pricePaise: 50000,
-      dietaryTags: ['organic', 'vegan'],
-      allergens: [],
-      deliveryDays: 2
-    },
-    {
-      id: '00000000-0000-0000-0000-000000000004',
-      name: 'Chia Seed Pudding Mix',
-      description: 'Omega-3 rich superfood. Just add milk and refrigerate overnight.',
-      pricePaise: 35000,
-      dietaryTags: ['vegan', 'gluten-free'],
-      allergens: [],
-      deliveryDays: 0
-    },
-    {
-      id: '00000000-0000-0000-0000-000000000005',
-      name: 'Matcha Green Tea Powder',
-      description: 'Premium Japanese matcha. Rich in antioxidants and L-Theanine.',
-      pricePaise: 75000,
-      dietaryTags: ['vegan', 'organic'],
-      allergens: [],
-      deliveryDays: 1
-    }
-  ];
+  // Full catalog — loaded from the API. The AI will filter this based on parsed rules.
+  catalog: any[] = [];
+
+  private readonly MERCHANT_ID = '10000000-0000-0000-0000-000000000001';
 
   constructor(
     private intentService: IntentService,
     private cartService: CartService,
     private router: Router
   ) {}
+
+  ngOnInit() {
+    this.cartService.getCatalog(this.MERCHANT_ID).subscribe({
+      next: (res) => {
+        this.catalog = res.products || [];
+        this.catalogLoading = false;
+      },
+      error: (err) => {
+        console.error('Failed to load catalog:', err);
+        this.catalogLoading = false;
+      }
+    });
+  }
+
 
   goShopping() {
     if (!this.prompt.trim()) return;
@@ -427,8 +398,7 @@ export class HomeComponent {
         this.loadingStep = '⏳ Step 3: Running policy checks...';
 
         // Step 3: Create proof cart with the real intentId
-        const merchantId = '10000000-0000-0000-0000-000000000001';
-        this.cartService.createProofCart(merchantId, intentResult.intentId, selectedItems).subscribe({
+        this.cartService.createProofCart(this.MERCHANT_ID, intentResult.intentId, selectedItems).subscribe({
           next: (cartResult) => {
             this.stepsDone = 3;
             this.loading = false;
@@ -500,12 +470,13 @@ export class HomeComponent {
     }
 
     // Filter by delivery
-    if (rules.deliveryRequirement) {
-      const req = rules.deliveryRequirement.toLowerCase();
-      if (req.includes('today') || req.includes('same day')) {
-        candidates = candidates.filter(p => p.deliveryDays === 0);
-      } else if (req.includes('tomorrow') || req.includes('next day')) {
-        candidates = candidates.filter(p => p.deliveryDays <= 1);
+    if (rules.deliveryRequirement != null) {
+      // deliveryRequirement can be a string ("today", "tomorrow") or a number
+      const req = String(rules.deliveryRequirement).toLowerCase();
+      if (req.includes('today') || req.includes('same day') || req === '0') {
+        candidates = candidates.filter((p: any) => p.deliveryDays === 0);
+      } else if (req.includes('tomorrow') || req.includes('next day') || req === '1') {
+        candidates = candidates.filter((p: any) => p.deliveryDays <= 1);
       }
     }
 

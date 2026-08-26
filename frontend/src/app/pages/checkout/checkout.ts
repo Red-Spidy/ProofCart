@@ -92,20 +92,19 @@ export class CheckoutComponent implements OnInit {
       handler: (response: any) => {
         this.verifyPayment(response);
       },
+      modal: {
+        ondismiss: () => {
+          console.log('Razorpay modal dismissed by user.');
+        }
+      },
       theme: {color: '#0ea5e9'}
     };
 
-    // Check if Razorpay script is loaded. If not, bypass for demo purposes.
     if (typeof Razorpay !== 'undefined') {
       const rzp = new Razorpay(options);
       rzp.open();
     } else {
-      // Mock payment verification if running without internet / RZP script
-      this.verifyPayment({
-        razorpay_order_id: this.razorpayOrderId,
-        razorpay_payment_id: 'pay_mock_' + Math.random().toString(36).substring(7),
-        razorpay_signature: 'mock_signature'
-      });
+      alert('Payment gateway failed to load. Please check your internet connection and refresh the page.');
     }
   }
 
@@ -114,10 +113,9 @@ export class CheckoutComponent implements OnInit {
       next: () => {
         this.router.navigate(['/receipt', this.orderId]);
       },
-      error: () => {
-        // In a mock environment the signature will fail on the backend,
-        // so we'll just navigate to receipt anyway to show the audit trail for the demo.
-        this.router.navigate(['/receipt', this.orderId]);
+      error: (err) => {
+        console.error('Payment verification failed:', err);
+        alert('Payment verification failed. Please contact support with your order ID: ' + this.orderId);
       }
     });
   }

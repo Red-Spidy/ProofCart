@@ -283,6 +283,7 @@ export class CartReviewComponent implements OnInit {
   cartId!: string;
   cart: any = null;
   loading = false;
+  loadingCart = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -297,8 +298,18 @@ export class CartReviewComponent implements OnInit {
     this.cart = nav?.extras?.state?.['cart'] || history.state?.cart;
 
     if (!this.cart) {
-      // If we lost the state (e.g. page refresh), redirect home
-      this.router.navigate(['/']);
+      // State lost (page refresh) — reload from backend instead of redirecting away
+      this.loadingCart = true;
+      this.cartService.getCart(this.cartId).subscribe({
+        next: (cartData) => {
+          this.cart = cartData;
+          this.loadingCart = false;
+        },
+        error: () => {
+          this.loadingCart = false;
+          this.router.navigate(['/']);
+        }
+      });
     }
   }
 

@@ -106,9 +106,11 @@ public class SupabaseJwtAuthenticationFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
         } catch (JwtException e) {
+            // Token is present but invalid (expired, bad signature, wrong issuer, etc.)
+            // Clear context and continue the chain — Spring Security will enforce
+            // authorization rules. Public routes will still be accessible;
+            // protected routes will receive a 401/403 from Spring Security itself.
             SecurityContextHolder.clearContext();
-            sendUnauthorized(response, "Invalid or expired token: " + e.getMessage());
-            return;
         }
 
         filterChain.doFilter(request, response);

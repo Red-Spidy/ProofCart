@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import {createClient, SupabaseClient, Session, User, AuthChangeEvent} from '@supabase/supabase-js';
+import {AuthChangeEvent, createClient, Session, SupabaseClient, User} from '@supabase/supabase-js';
 import {BehaviorSubject, Observable} from 'rxjs';
 
 const SUPABASE_URL = 'https://fqrdwzzyzckinlkryand.supabase.co';
@@ -21,20 +21,24 @@ export class SupabaseService {
       auth: {
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: true
+        detectSessionInUrl: true,
+        storageKey: 'supabase.auth.token'
       }
     });
 
-    // Restore session on init
-    this.supabase.auth.getSession().then(({data}) => {
-      this._session$.next(data.session);
-      this._user$.next(data.session?.user ?? null);
-    });
-
-    // Listen for auth state changes (login, logout, token refresh)
+    // Listen for auth state changes FIRST — this fires synchronously with the
+    // existing persisted session when the SDK initializes, before any HTTP calls
     this.supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       this._session$.next(session);
       this._user$.next(session?.user ?? null);
+    });
+
+    // Belt-and-suspenders: also do an explicit getSession to catch any edge cases
+    this.supabase.auth.getSession().then(({data}) => {
+      if (data.session && !this._session$.getValue()) {
+        this._session$.next(data.session);
+        this._user$.next(data.session.user);
+      }
     });
   }
 
@@ -62,7 +66,18 @@ export class SupabaseService {
 
   /** Get the current access token (for HTTP interceptor) */
   async getAccessToken(): Promise<string | null> {
+    // First try the in-memory session (populated synchronously from localStorage on init)
+    const inMemorySession = this._session$.getValue();
+    if (inMemorySession?.access_token) {
+      return inMemorySession.access_token;
+    }
+    // Fallback: ask Supabase SDK directly (handles first-load race condition)
     const {data} = await this.supabase.auth.getSession();
+    if (data.session) {
+      // Sync the BehaviorSubject so future calls are instant
+      this._session$.next(data.session);
+      this._user$.next(data.session.user);
+    }
     return data.session?.access_token ?? null;
   }
 

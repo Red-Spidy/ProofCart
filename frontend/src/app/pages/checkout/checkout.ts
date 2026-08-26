@@ -83,7 +83,7 @@ export class CheckoutComponent implements OnInit {
 
   openRazorpay() {
     const options = {
-      key: 'rzp_test_mock_key', // Replace with real key in environment
+      key: 'rzp_test_TU9MeiRpMwEZmq',
       amount: this.amountPaise,
       currency: 'INR',
       name: 'NutriBasket',

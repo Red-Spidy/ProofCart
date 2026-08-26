@@ -1,17 +1,31 @@
 import {Component} from '@angular/core';
-import {RouterLink} from '@angular/router';
+import {RouterLink, RouterLinkActive} from '@angular/router';
 
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, RouterLinkActive],
   template: `
-    <nav class="glass-panel navbar">
-      <div class="nav-content">
-        <a routerLink="/" class="logo text-gradient">NutriBasket AI</a>
-        <div class="nav-links">
-          <a routerLink="/" class="nav-link">Shop</a>
-          <span class="badge badge-success">Safe Shopping Active</span>
+    <nav class="navbar">
+      <div class="nav-inner">
+        <a routerLink="/" class="logo">
+          <span class="logo-icon">🛒</span>
+          <span class="logo-text">
+            <span class="text-gradient">Nutri</span><span>Basket</span>
+          </span>
+        </a>
+
+        <div class="nav-center">
+          <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-link">
+            <span>🏠</span> Home
+          </a>
+        </div>
+
+        <div class="nav-right">
+          <div class="status-pill">
+            <span class="status-dot"></span>
+            <span>AI Protected</span>
+          </div>
         </div>
       </div>
     </nav>
@@ -20,38 +34,102 @@ import {RouterLink} from '@angular/router';
     .navbar {
       position: sticky;
       top: 0;
-      z-index: 50;
-      border-radius: 0 0 16px 16px;
-      margin-bottom: 2rem;
+      z-index: 100;
+      background: rgba(10, 14, 26, 0.85);
+      backdrop-filter: blur(20px) saturate(1.4);
+      -webkit-backdrop-filter: blur(20px) saturate(1.4);
+      border-bottom: 1px solid var(--border-subtle);
     }
-    .nav-content {
+
+    .nav-inner {
       max-width: 1200px;
       margin: 0 auto;
-      padding: 1rem 2rem;
+      padding: 0 1.5rem;
+      height: 64px;
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      align-items: center;
     }
+
     .logo {
-      font-size: 1.5rem;
-      font-weight: 700;
-      text-decoration: none;
-    }
-    .nav-links {
       display: flex;
-      gap: 1.5rem;
       align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+      color: var(--text-primary);
     }
+
+    .logo-icon {
+      font-size: 1.5rem;
+    }
+
+    .logo-text {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .nav-center {
+      display: flex;
+      gap: 0.25rem;
+    }
+
     .nav-link {
-      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
       text-decoration: none;
       font-weight: 500;
-      transition: color 0.2s;
+      font-size: 0.875rem;
+      transition: all 0.2s ease;
     }
+
     .nav-link:hover {
-      color: var(--primary-glow);
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-link.active {
+      color: var(--accent-blue-light);
+      background: rgba(59, 130, 246, 0.1);
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.375rem 0.875rem;
+      border-radius: var(--radius-full);
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent-emerald);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      animation: pulse-dot 2s ease infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--accent-emerald); }
+      50% { opacity: 0.5; box-shadow: 0 0 8px var(--accent-emerald); }
     }
   `]
 })
-export class NavbarComponent {
-}
+export class NavbarComponent {}

@@ -6,46 +6,99 @@ import {CommonModule} from '@angular/common';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="policy-item glass-panel" [ngClass]="check.passed ? 'passed' : 'failed'">
-      <div class="header">
-        <div class="icon">
-          <span *ngIf="check.passed">✓</span>
-          <span *ngIf="!check.passed">✕</span>
-        </div>
-        <span class="rule-name">{{ check.rule | titlecase }}</span>
+    <div class="check-row" [class.passed]="check.passed" [class.failed]="!check.passed">
+      <div class="check-status">
+        <span class="check-icon" *ngIf="check.passed">✓</span>
+        <span class="check-icon" *ngIf="!check.passed">✕</span>
       </div>
-      <div class="reason">{{ check.reason }}</div>
+      <div class="check-info">
+        <span class="check-name">{{ formatRuleName(check.rule) }}</span>
+        <span class="check-msg">{{ check.message || check.reason }}</span>
+      </div>
+      <div class="check-badge">
+        <span class="badge" [ngClass]="check.passed ? 'badge-success' : 'badge-danger'">
+          {{ check.passed ? 'PASS' : 'FAIL' }}
+        </span>
+      </div>
     </div>
   `,
   styles: [`
-    .policy-item {
-      padding: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      border-left: 4px solid;
-    }
-    .passed {
-      border-left-color: var(--success-glow);
-    }
-    .failed {
-      border-left-color: var(--danger-glow);
-      background: rgba(248, 113, 113, 0.05);
-    }
-    .header {
+    .check-row {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      font-weight: 600;
+      gap: 1rem;
+      padding: 0.875rem 1rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      background: rgba(255, 255, 255, 0.02);
+      transition: all 0.2s ease;
     }
-    .passed .icon { color: var(--success-glow); }
-    .failed .icon { color: var(--danger-glow); }
-    .reason {
+
+    .check-row:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .check-row.passed {
+      border-left: 3px solid var(--accent-emerald);
+    }
+
+    .check-row.failed {
+      border-left: 3px solid var(--accent-rose);
+      background: rgba(244, 63, 94, 0.04);
+    }
+
+    .check-status {
+      flex-shrink: 0;
+    }
+
+    .check-icon {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-size: 0.8125rem;
+      font-weight: 700;
+    }
+
+    .passed .check-icon {
+      background: rgba(16, 185, 129, 0.12);
+      color: var(--accent-emerald);
+    }
+
+    .failed .check-icon {
+      background: rgba(244, 63, 94, 0.12);
+      color: var(--accent-rose);
+    }
+
+    .check-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.125rem;
+    }
+
+    .check-name {
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+
+    .check-msg {
+      font-size: 0.8125rem;
       color: var(--text-muted);
-      font-size: 0.9rem;
+    }
+
+    .check-badge {
+      flex-shrink: 0;
     }
   `]
 })
 export class PolicyBadgeComponent {
   @Input() check: any;
+
+  formatRuleName(name: string): string {
+    if (!name) return '';
+    return name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  }
 }

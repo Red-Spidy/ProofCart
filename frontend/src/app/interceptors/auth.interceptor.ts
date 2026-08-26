@@ -1,15 +1,26 @@
 import {HttpInterceptorFn} from '@angular/common/http';
+import {inject} from '@angular/core';
+import {SupabaseService} from '../services/supabase.service';
+import {from, switchMap} from 'rxjs';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  const token = localStorage.getItem('auth_token') || 'test-token';
+  const supabase = inject(SupabaseService);
 
-  // Clone the request and add the authorization header
-  const authReq = req.clone({
-    setHeaders: {
-      Authorization: `Bearer ${token}`
-    }
-  });
-
-  // Pass on the cloned request instead of the original request.
-  return next(authReq);
+  // Convert the promise to an observable
+  return from(supabase.getAccessToken()).pipe(
+    switchMap(token => {
+      // If we have a token, clone the request and add the Authorization header
+      if (token) {
+        const authReq = req.clone({
+          setHeaders: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        return next(authReq);
+      }
+      
+      // If no token, just pass the original request (e.g. for public routes)
+      return next(req);
+    })
+  );
 };

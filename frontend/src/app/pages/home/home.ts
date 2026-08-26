@@ -95,8 +95,23 @@ import {ProductCardComponent} from '../../components/product-card/product-card';
       <section class="catalog-section animate-fade-in animate-fade-in-delay-3" *ngIf="!loading">
         <div class="catalog-header">
           <h2>🛍️ NutriBasket Catalog</h2>
-          <span class="text-secondary">{{ catalog.length }} available products</span>
+          <div class="catalog-search">
+            <input
+              type="text"
+              class="input-glass catalog-search-input"
+              placeholder="Search products (e.g. oats, almond milk)..."
+              [(ngModel)]="catalogSearch"
+              (keyup.enter)="searchCatalog()"
+            />
+            <button class="btn btn-secondary btn-sm" (click)="searchCatalog()" [disabled]="catalogSearching">
+              {{ catalogSearching ? '⏳' : '🔍 Search' }}
+            </button>
+            <button *ngIf="catalogSearch" class="btn btn-sm" style="opacity:0.6" (click)="clearSearch()">✕ Clear</button>
+          </div>
         </div>
+        <p *ngIf="catalogSearch && !catalogSearching" class="text-secondary text-sm" style="margin-bottom:1.5rem">
+          Showing results for "{{ catalogSearch }}" from Open Food Facts
+        </p>
         <div class="product-grid">
           <app-product-card
             *ngFor="let p of catalog; let i = index"
@@ -279,12 +294,26 @@ import {ProductCardComponent} from '../../components/product-card/product-card';
     .catalog-header {
       display: flex;
       justify-content: space-between;
-      align-items: baseline;
+      align-items: flex-start;
       margin-bottom: 2rem;
+      gap: 1rem;
+      flex-wrap: wrap;
     }
 
     .catalog-header h2 {
       font-size: 1.75rem;
+    }
+
+    .catalog-search {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .catalog-search-input {
+      padding: 0.5rem 0.875rem;
+      font-size: 0.875rem;
+      min-width: 260px;
     }
 
     .product-grid {
@@ -345,6 +374,8 @@ export class HomeComponent implements OnInit {
   intent: IntentExtraction | null = null;
   errorMessage = '';
   catalogLoading = true;
+  catalogSearch = '';
+  catalogSearching = false;
 
   // Full catalog — loaded from the API. The AI will filter this based on parsed rules.
   catalog: any[] = [];
@@ -368,6 +399,30 @@ export class HomeComponent implements OnInit {
         this.catalogLoading = false;
       }
     });
+  }
+
+  searchCatalog() {
+    if (!this.catalogSearch.trim()) {
+      // Reset to default catalog
+      this.ngOnInit();
+      return;
+    }
+    this.catalogSearching = true;
+    this.cartService.getCatalog(this.MERCHANT_ID, this.catalogSearch).subscribe({
+      next: (res) => {
+        this.catalog = res.products || [];
+        this.catalogSearching = false;
+      },
+      error: (err) => {
+        console.error('Catalog search error:', err);
+        this.catalogSearching = false;
+      }
+    });
+  }
+
+  clearSearch() {
+    this.catalogSearch = '';
+    this.ngOnInit();
   }
 
 

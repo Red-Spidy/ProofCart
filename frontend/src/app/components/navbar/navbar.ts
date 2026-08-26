@@ -1,10 +1,12 @@
 import {Component} from '@angular/core';
-import {RouterLink, RouterLinkActive} from '@angular/router';
+import {RouterLink, RouterLinkActive, Router} from '@angular/router';
+import {CommonModule} from '@angular/common';
+import {SupabaseService} from '../../services/supabase.service';
 
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive],
+  imports: [RouterLink, RouterLinkActive, CommonModule],
   template: `
     <nav class="navbar">
       <div class="nav-inner">
@@ -19,9 +21,26 @@ import {RouterLink, RouterLinkActive} from '@angular/router';
           <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-link">
             <span>🏠</span> Home
           </a>
+          <ng-container *ngIf="supabase.session$ | async">
+            <a routerLink="/orders" routerLinkActive="active" class="nav-link">
+              <span>📦</span> Orders
+            </a>
+          </ng-container>
         </div>
 
         <div class="nav-right">
+          <!-- Shown when logged out -->
+          <ng-container *ngIf="(supabase.session$ | async) === null">
+            <a routerLink="/auth/login" class="nav-link">Sign In</a>
+            <a routerLink="/auth/signup" class="btn btn-primary btn-sm">Sign Up</a>
+          </ng-container>
+
+          <!-- Shown when logged in -->
+          <ng-container *ngIf="supabase.session$ | async as session">
+            <span class="user-email text-muted">{{ session.user.email }}</span>
+            <button class="nav-link" (click)="signOut()" style="background:transparent; border:none; cursor:pointer;">Sign Out</button>
+          </ng-container>
+
           <div class="status-pill">
             <span class="status-dot"></span>
             <span>AI Protected</span>
@@ -103,6 +122,16 @@ import {RouterLink, RouterLinkActive} from '@angular/router';
       gap: 1rem;
     }
 
+    .user-email {
+      font-size: 0.875rem;
+      margin-right: 0.5rem;
+    }
+
+    .btn-sm {
+      padding: 0.375rem 0.875rem;
+      font-size: 0.875rem;
+    }
+
     .status-pill {
       display: flex;
       align-items: center;
@@ -132,4 +161,11 @@ import {RouterLink, RouterLinkActive} from '@angular/router';
     }
   `]
 })
-export class NavbarComponent {}
+export class NavbarComponent {
+  constructor(public supabase: SupabaseService, private router: Router) {}
+
+  async signOut() {
+    await this.supabase.signOut();
+    this.router.navigate(['/auth/login']);
+  }
+}

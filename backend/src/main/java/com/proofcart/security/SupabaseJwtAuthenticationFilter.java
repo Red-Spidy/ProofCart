@@ -1,5 +1,7 @@
 package com.proofcart.security;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -14,47 +16,112 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
-import java.util.Base64;
-import java.util.List;
+import java.math.BigInteger;
+import java.security.AlgorithmParameters;
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.security.spec.ECGenParameterSpec;
+import java.security.spec.ECParameterSpec;
+import java.security.spec.ECPoint;
+import java.security.spec.ECPublicKeySpec;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Validates Supabase-issued JWT tokens (HS256 / HMAC-SHA-256).
+ * Validates Supabase-issued JWT tokens (both ES256 via JWKS and HS256 via secret).
  *
  * The token is sent by the Angular frontend as:
  *   Authorization: Bearer <supabase_access_token>
- *
- * On success:  SecurityContext principal = Supabase user UUID (sub claim)
- *              Authorities                = ["ROLE_" + role]  e.g. ROLE_authenticated
- * On failure:  Returns 401 JSON and stops the filter chain.
- *
- * Replaces the temporary BuyerAuthFilter (X-Buyer-Id header).
  */
 @Component
 public class SupabaseJwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final SecretKey signingKey;
-    private final String expectedIssuer;
-    private final String expectedAudience;
+    private final SecretKey hmacSecretKey;
+    private final String supabaseUrl;
+    private final Map<String, PublicKey> ecPublicKeyCache = new ConcurrentHashMap<>();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RestTemplate restTemplate = new RestTemplate();
 
     public SupabaseJwtAuthenticationFilter(
             @Value("${supabase.jwt.secret:}") String jwtSecretBase64,
-            @Value("${supabase.jwt.issuer:}") String issuer,
-            @Value("${supabase.jwt.audience:authenticated}") String audience) {
+            @Value("${supabase.url:https://fqrdwzzyzckinlkryand.supabase.co}") String supabaseUrl) {
 
-        this.expectedIssuer = issuer;
-        this.expectedAudience = audience;
+        this.supabaseUrl = supabaseUrl;
 
+        SecretKey key = null;
         if (jwtSecretBase64 != null && !jwtSecretBase64.isBlank()) {
-            byte[] keyBytes = Base64.getDecoder().decode(jwtSecretBase64);
-            this.signingKey = new SecretKeySpec(keyBytes, "HmacSHA256");
-        } else {
-            this.signingKey = null;
-            System.err.println("[SupabaseJwt] WARNING: SUPABASE_JWT_SECRET not set. All JWT auth will fail.");
+            try {
+                byte[] keyBytes = Base64.getDecoder().decode(jwtSecretBase64);
+                key = new SecretKeySpec(keyBytes, "HmacSHA256");
+            } catch (Exception e) {
+                System.err.println("[SupabaseJwt] Warning: Could not decode SUPABASE_JWT_SECRET as Base64: " + e.getMessage());
+            }
+        }
+        this.hmacSecretKey = key;
+
+        // Eagerly pre-load JWKS EC keys from Supabase
+        refreshJwksKeys();
+    }
+
+    private synchronized void refreshJwksKeys() {
+        if (supabaseUrl == null || supabaseUrl.isBlank()) return;
+        try {
+            String jwksUrl = supabaseUrl.replaceAll("/+$", "") + "/auth/v1/.well-known/jwks.json";
+            String jwksJson = restTemplate.getForObject(jwksUrl, String.class);
+            if (jwksJson != null) {
+                JsonNode root = objectMapper.readTree(jwksJson);
+                JsonNode keysNode = root.get("keys");
+                if (keysNode != null && keysNode.isArray()) {
+                    for (JsonNode keyNode : keysNode) {
+                        String kid = keyNode.path("kid").asText(null);
+                        String kty = keyNode.path("kty").asText(null);
+                        String alg = keyNode.path("alg").asText(null);
+
+                        if ("EC".equalsIgnoreCase(kty) && "ES256".equalsIgnoreCase(alg)) {
+                            String x = keyNode.path("x").asText();
+                            String y = keyNode.path("y").asText();
+                            PublicKey pubKey = parseEcPublicKey(x, y);
+                            if (pubKey != null) {
+                                if (kid != null) {
+                                    ecPublicKeyCache.put(kid, pubKey);
+                                }
+                                ecPublicKeyCache.put("default", pubKey);
+                                System.out.println("[SupabaseJwt] Loaded ES256 key from Supabase JWKS (kid: " + kid + ")");
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[SupabaseJwt] Failed to load JWKS keys from Supabase: " + e.getMessage());
+        }
+    }
+
+    private PublicKey parseEcPublicKey(String xBase64Url, String yBase64Url) {
+        try {
+            byte[] xBytes = Base64.getUrlDecoder().decode(xBase64Url);
+            byte[] yBytes = Base64.getUrlDecoder().decode(yBase64Url);
+
+            BigInteger xCoord = new BigInteger(1, xBytes);
+            BigInteger yCoord = new BigInteger(1, yBytes);
+            ECPoint ecPoint = new ECPoint(xCoord, yCoord);
+
+            AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
+            parameters.init(new ECGenParameterSpec("secp256r1"));
+            ECParameterSpec ecParameterSpec = parameters.getParameterSpec(ECParameterSpec.class);
+
+            ECPublicKeySpec pubKeySpec = new ECPublicKeySpec(ecPoint, ecParameterSpec);
+            KeyFactory keyFactory = KeyFactory.getInstance("EC");
+            return keyFactory.generatePublic(pubKeySpec);
+        } catch (Exception e) {
+            System.err.println("[SupabaseJwt] Error constructing EC Public Key: " + e.getMessage());
+            return null;
         }
     }
 
@@ -73,20 +140,8 @@ public class SupabaseJwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7);
 
-        // JWT secret not configured — reject immediately
-        if (signingKey == null) {
-            sendUnauthorized(response, "Authentication not configured on server.");
-            return;
-        }
-
         try {
-            Claims claims = Jwts.parser()
-                    .verifyWith(signingKey)
-                    .requireIssuer(expectedIssuer)
-                    .requireAudience(expectedAudience)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
+            Claims claims = validateAndParseClaims(token);
 
             String userId = claims.getSubject();   // Supabase user UUID
             String role   = claims.get("role", String.class);  // "authenticated", "anon", etc.
@@ -105,15 +160,55 @@ public class SupabaseJwtAuthenticationFilter extends OncePerRequestFilter {
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        } catch (JwtException e) {
-            // Token is present but invalid (expired, bad signature, wrong issuer, etc.)
-            // Clear context and continue the chain — Spring Security will enforce
-            // authorization rules. Public routes will still be accessible;
-            // protected routes will receive a 401/403 from Spring Security itself.
+        } catch (Exception e) {
+            System.err.println("[SupabaseJwt] Token validation failed: " + e.getMessage());
             SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private Claims validateAndParseClaims(String token) {
+        // Try parsing with cached EC Public Keys (for ES256 tokens)
+        for (PublicKey pubKey : ecPublicKeyCache.values()) {
+            try {
+                return Jwts.parser()
+                        .verifyWith(pubKey)
+                        .build()
+                        .parseSignedClaims(token)
+                        .getPayload();
+            } catch (Exception ignored) {
+            }
+        }
+
+        // Try refreshing keys if not found
+        if (ecPublicKeyCache.isEmpty()) {
+            refreshJwksKeys();
+            for (PublicKey pubKey : ecPublicKeyCache.values()) {
+                try {
+                    return Jwts.parser()
+                            .verifyWith(pubKey)
+                            .build()
+                            .parseSignedClaims(token)
+                            .getPayload();
+                } catch (Exception ignored) {
+                }
+            }
+        }
+
+        // Fallback: try HMAC secret key if configured (for HS256 tokens)
+        if (hmacSecretKey != null) {
+            try {
+                return Jwts.parser()
+                        .verifyWith(hmacSecretKey)
+                        .build()
+                        .parseSignedClaims(token)
+                        .getPayload();
+            } catch (Exception ignored) {
+            }
+        }
+
+        throw new JwtException("Could not verify JWT signature with available ES256 or HS256 keys");
     }
 
     private void sendUnauthorized(HttpServletResponse response, String message) throws IOException {

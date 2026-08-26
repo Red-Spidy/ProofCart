@@ -29,4 +29,15 @@ public class WebConfig implements WebMvcConfigurer {
         template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
         return template;
     }
+
+    @Bean
+    public org.springframework.data.redis.cache.RedisCacheConfiguration cacheConfiguration() {
+        return org.springframework.data.redis.cache.RedisCacheConfiguration.defaultCacheConfig()
+                .entryTtl(java.time.Duration.ofMinutes(10))
+                .disableCachingNullValues()
+                .serializeValuesWith(
+                        org.springframework.data.redis.serializer.RedisSerializationContext.SerializationPair
+                                .fromSerializer(new GenericJackson2JsonRedisSerializer())
+                );
+    }
 }

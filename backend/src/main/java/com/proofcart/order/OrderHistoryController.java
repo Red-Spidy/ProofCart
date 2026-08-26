@@ -5,7 +5,6 @@ import com.proofcart.domain.entity.ProofCartEntity;
 import com.proofcart.domain.repo.CheckoutOrderRepository;
 import com.proofcart.domain.repo.ProofCartRepository;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,13 +30,13 @@ public class OrderHistoryController {
 
     @GetMapping
     @Cacheable(value = "orderHistory", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
-    public ResponseEntity<?> getOrderHistory() {
+    public Map<String, Object> getOrderHistory() {
         String buyerIdStr = SecurityContextHolder.getContext().getAuthentication().getName();
         UUID buyerId;
         try {
             buyerId = UUID.fromString(buyerIdStr);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(401).body(Map.of("error", "Invalid user context"));
+            return Map.of("history", List.of(), "error", "Invalid user context");
         }
 
         List<ProofCartEntity> carts = proofCartRepository.findByBuyerIdOrderByCreatedAtDesc(buyerId);
@@ -46,26 +45,26 @@ public class OrderHistoryController {
         // Map carts to a simplified DTO
         List<Map<String, Object>> mappedCarts = carts.stream().map(cart -> {
             Map<String, Object> map = new HashMap<>();
-            map.put("id", cart.getId());
+            map.put("id", cart.getId().toString());
             // Derive a human-readable status from the entity fields
-            String cartStatus = cart.getApproved() ? "APPROVED" : cart.getPolicyDecision();
-            map.put("status", cartStatus);
+            String cartStatus = (cart.getApproved() != null && cart.getApproved()) ? "APPROVED" : cart.getPolicyDecision();
+            map.put("status", cartStatus != null ? cartStatus : "PENDING");
             map.put("totalPaise", cart.getTotalPaise());
-            map.put("createdAt", cart.getCreatedAt());
+            map.put("createdAt", cart.getCreatedAt() != null ? cart.getCreatedAt().toString() : null);
 
             // Find corresponding order if it exists
             CheckoutOrderEntity linkedOrder = orders.stream()
-                    .filter(o -> o.getCartId().equals(cart.getId()))
+                    .filter(o -> o.getCartId() != null && o.getCartId().equals(cart.getId()))
                     .findFirst()
                     .orElse(null);
 
             if (linkedOrder != null) {
-                map.put("orderId", linkedOrder.getId());
+                map.put("orderId", linkedOrder.getId().toString());
                 map.put("paymentStatus", linkedOrder.getStatus());
             }
             return map;
         }).collect(Collectors.toList());
 
-        return ResponseEntity.ok(Map.of("history", mappedCarts));
+        return Map.of("history", mappedCarts);
     }
 }

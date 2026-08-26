@@ -39,6 +39,11 @@ import {CommonModule} from '@angular/common';
           Add
         </button>
       </div>
+      <div class="feedback-row">
+        <span>Was this useful?</span>
+        <button class="feedback-btn" (click)="feedback.emit({product: product, liked: true})" aria-label="Like product">👍</button>
+        <button class="feedback-btn" (click)="feedback.emit({product: product, liked: false})" aria-label="Dislike product">👎</button>
+      </div>
     </div>
   `,
   styles: [`
@@ -128,11 +133,16 @@ import {CommonModule} from '@angular/common';
       font-weight: 700;
       font-size: 0.875rem;
     }
+
+    .feedback-row { padding: 0 1.25rem 1rem; display: flex; align-items: center; gap: .4rem; color: var(--text-muted); font-size: .75rem; }
+    .feedback-btn { border: 0; background: transparent; cursor: pointer; opacity: .75; padding: .15rem; }
+    .feedback-btn:hover { opacity: 1; transform: scale(1.1); }
   `]
 })
 export class ProductCardComponent {
   @Input() product: any;
   @Output() addToCart = new EventEmitter<{ product: any, quantity: number }>();
+  @Output() feedback = new EventEmitter<{ product: any, liked: boolean }>();
 
   qty = 1;
 

@@ -44,5 +44,12 @@ export class CartService {
       : `${this.apiUrl}/catalog/${merchantId}`;
     return this.http.get(url);
   }
-}
 
+  recordPreference(eventType: 'SEARCH' | 'LIKE' | 'DISLIKE', productId?: string, searchTerm?: string): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/personalization/events`, {eventType, productId, searchTerm});
+  }
+
+  getRecommendations(merchantId: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/personalization/recommendations?merchantId=${merchantId}`);
+  }
+}

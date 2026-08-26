@@ -93,6 +93,16 @@ import {ProductCardComponent} from '../../components/product-card/product-card';
 
       <!-- Catalog (Always visible below) -->
       <section class="catalog-section animate-fade-in animate-fade-in-delay-3" *ngIf="!loading">
+        <div class="recommendations" *ngIf="recommendations.length && !catalogSearch">
+          <h2>✨ Picked for you</h2>
+          <p class="text-secondary text-sm">Learns from your searches and feedback. Only you influence these suggestions.</p>
+          <div class="product-grid">
+            <div *ngFor="let p of recommendations" class="recommendation-card">
+              <span class="recommendation-reason">{{ p.reason }}</span>
+              <app-product-card [product]="p" (feedback)="recordFeedback($event)"></app-product-card>
+            </div>
+          </div>
+        </div>
         <div class="catalog-header">
           <h2>🛍️ NutriBasket Catalog</h2>
           <div class="catalog-search">
@@ -117,7 +127,8 @@ import {ProductCardComponent} from '../../components/product-card/product-card';
             *ngFor="let p of catalog; let i = index"
             [product]="p"
             [class]="'animate-fade-in'"
-            [style.animation-delay.ms]="i * 80">
+            [style.animation-delay.ms]="i * 80"
+            (feedback)="recordFeedback($event)">
           </app-product-card>
         </div>
       </section>
@@ -125,6 +136,10 @@ import {ProductCardComponent} from '../../components/product-card/product-card';
   `,
   styles: [`
     .page { padding-bottom: 4rem; }
+    .recommendations { margin: 1.5rem 0 3rem; }
+    .recommendations h2 { margin-bottom: .35rem; }
+    .recommendation-card { position: relative; }
+    .recommendation-reason { display: block; color: var(--accent-blue-light); font-size: .75rem; margin: .75rem 0 .35rem; }
 
     /* ── Hero ──── */
     .hero {
@@ -376,6 +391,7 @@ export class HomeComponent implements OnInit {
   catalogLoading = true;
   catalogSearch = '';
   catalogSearching = false;
+  recommendations: any[] = [];
 
   // Full catalog — loaded from the API. The AI will filter this based on parsed rules.
   catalog: any[] = [];
@@ -399,6 +415,10 @@ export class HomeComponent implements OnInit {
         this.catalogLoading = false;
       }
     });
+    this.cartService.getRecommendations(this.MERCHANT_ID).subscribe({
+      next: (res) => this.recommendations = res.products || [],
+      error: () => this.recommendations = []
+    });
   }
 
   searchCatalog() {
@@ -412,6 +432,7 @@ export class HomeComponent implements OnInit {
       next: (res) => {
         this.catalog = res.products || [];
         this.catalogSearching = false;
+        this.cartService.recordPreference('SEARCH', undefined, this.catalogSearch.trim()).subscribe();
       },
       error: (err) => {
         console.error('Catalog search error:', err);
@@ -423,6 +444,19 @@ export class HomeComponent implements OnInit {
   clearSearch() {
     this.catalogSearch = '';
     this.ngOnInit();
+  }
+
+  recordFeedback(event: { product: any, liked: boolean }) {
+    this.cartService.recordPreference(event.liked ? 'LIKE' : 'DISLIKE', event.product.id).subscribe({
+      next: () => this.refreshRecommendations(),
+      error: (err) => console.error('Could not save feedback:', err)
+    });
+  }
+
+  private refreshRecommendations() {
+    this.cartService.getRecommendations(this.MERCHANT_ID).subscribe({
+      next: (res) => this.recommendations = res.products || []
+    });
   }
 
 

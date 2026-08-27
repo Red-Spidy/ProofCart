@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.proofcart.domain.entity.CheckoutOrderEntity;
 import com.proofcart.domain.repo.CheckoutOrderRepository;
+import com.proofcart.inventory.InventoryReservationService;
 import com.razorpay.Utils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -18,12 +19,14 @@ public class RazorpayWebhookController {
     private final CheckoutOrderRepository orderRepo;
     private final ObjectMapper objectMapper;
     private final String webhookSecret;
+    private final InventoryReservationService inventory;
 
     public RazorpayWebhookController(CheckoutOrderRepository orderRepo,
-                                     ObjectMapper objectMapper,
+                                     ObjectMapper objectMapper, InventoryReservationService inventory,
                                      @Value("${razorpay.webhook.secret:}") String webhookSecret) {
         this.orderRepo = orderRepo;
         this.objectMapper = objectMapper;
+        this.inventory = inventory;
         this.webhookSecret = webhookSecret;
     }
 
@@ -59,6 +62,7 @@ public class RazorpayWebhookController {
                 if (order != null) {
                     // Idempotency: do not double-process
                     if (!"PAID".equals(order.getStatus())) {
+                        inventory.capture(order.getId());
                         order.setRazorpayPaymentId(razorpayPaymentId);
                         order.setStatus("PAID");
                         orderRepo.save(order);
@@ -69,6 +73,7 @@ public class RazorpayWebhookController {
                 String razorpayOrderId = root.path("payload").path("payment").path("entity").path("order_id").asText();
                 CheckoutOrderEntity order = orderRepo.findByRazorpayOrderId(razorpayOrderId);
                 if (order != null && !"PAID".equals(order.getStatus())) {
+                    inventory.release(order.getId(), InventoryReservationService.RELEASED);
                     order.setStatus("FAILED");
                     orderRepo.save(order);
                     System.out.println("[webhook] Marked order " + razorpayOrderId + " as FAILED via webhook.");

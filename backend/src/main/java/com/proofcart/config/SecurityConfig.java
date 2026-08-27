@@ -37,6 +37,8 @@ public class SecurityConfig {
                         .requestMatchers("/h2-console/**").permitAll()
                         // Public: Catalog lookup (no login required to browse products)
                         .requestMatchers("/api/catalog/**").permitAll()
+                        // Public: Recommendations & Personalization signals
+                        .requestMatchers("/api/personalization/**").permitAll()
                         // Public: Intent parsing (entry point of the flow)
                         .requestMatchers("/api/intents/**").permitAll()
                         // Public: Razorpay webhooks (Razorpay calls this server-to-server)

@@ -1,5 +1,5 @@
 import {Component} from '@angular/core';
-import {RouterLink, RouterLinkActive, Router} from '@angular/router';
+import {Router, RouterLink, RouterLinkActive} from '@angular/router';
 import {CommonModule} from '@angular/common';
 import {SupabaseService} from '../../services/supabase.service';
 
@@ -24,6 +24,9 @@ import {SupabaseService} from '../../services/supabase.service';
           <ng-container *ngIf="supabase.session$ | async">
             <a routerLink="/orders" routerLinkActive="active" class="nav-link">
               <span>📦</span> Orders
+            </a>
+            <a *ngIf="isSeller()" routerLink="/seller" routerLinkActive="active" class="nav-link">
+              <span>🏪</span> Seller Console
             </a>
           </ng-container>
         </div>
@@ -167,5 +170,9 @@ export class NavbarComponent {
   async signOut() {
     await this.supabase.signOut();
     this.router.navigate(['/auth/login']);
+  }
+
+  isSeller() {
+    return this.supabase.currentUser?.user_metadata?.['marketplace_role'] === 'MERCHANT';
   }
 }

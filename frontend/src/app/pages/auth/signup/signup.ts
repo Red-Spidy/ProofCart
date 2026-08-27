@@ -27,6 +27,19 @@ import {SupabaseService} from '../../../services/supabase.service';
 
         <form (ngSubmit)="signUp()" class="auth-form" *ngIf="!success">
           <div class="field-group">
+            <label for="name">Your name</label>
+            <input id="name" class="input-glass" [(ngModel)]="name" name="name" placeholder="Your name or store owner name" required autocomplete="name" />
+          </div>
+
+          <div class="field-group">
+            <label for="role">I want to</label>
+            <select id="role" class="input-glass" [(ngModel)]="role" name="role">
+              <option value="BUYER">Shop products</option>
+              <option value="MERCHANT">Sell products</option>
+            </select>
+          </div>
+
+          <div class="field-group">
             <label for="email">Email</label>
             <input
               id="email"
@@ -107,6 +120,8 @@ import {SupabaseService} from '../../../services/supabase.service';
 })
 export class SignupComponent {
   email = '';
+  name = '';
+  role: 'BUYER' | 'MERCHANT' = 'BUYER';
   password = '';
   confirmPassword = '';
   loading = false;
@@ -127,7 +142,7 @@ export class SignupComponent {
     }
     this.loading = true;
 
-    const {error} = await this.supabase.signUp(this.email, this.password);
+    const {error} = await this.supabase.signUp(this.email, this.password, this.name, this.role);
 
     if (error) {
       this.errorMessage = error.message;

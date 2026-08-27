@@ -7,6 +7,7 @@ import {LoginComponent} from './pages/auth/login/login';
 import {SignupComponent} from './pages/auth/signup/signup';
 import {ForgotPasswordComponent} from './pages/auth/forgot-password/forgot-password';
 import {OrdersComponent} from './pages/orders/orders';
+import {SellerDashboardComponent} from './pages/seller-dashboard/seller-dashboard';
 import {authGuard, guestGuard} from './guards/auth.guard';
 
 export const routes: Routes = [
@@ -18,6 +19,7 @@ export const routes: Routes = [
   // Protected app routes
   {path: '', component: HomeComponent, canActivate: [authGuard]},
   {path: 'orders', component: OrdersComponent, canActivate: [authGuard]},
+  {path: 'seller', component: SellerDashboardComponent, canActivate: [authGuard]},
   {path: 'review/:cartId', component: CartReviewComponent, canActivate: [authGuard]},
   {path: 'checkout/:cartId', component: CheckoutComponent, canActivate: [authGuard]},
   {path: 'receipt/:orderId', component: AuditReceiptComponent, canActivate: [authGuard]},

@@ -1,5 +1,6 @@
 package com.proofcart.catalog;
 
+import com.proofcart.cache.CatalogCacheService;
 import com.proofcart.domain.entity.ProductEntity;
 import com.proofcart.domain.repo.ProductRepository;
 import org.springframework.http.ResponseEntity;
@@ -19,10 +20,12 @@ public class CatalogController {
 
     private final ProductRepository productRepository;
     private final CatalogService catalogService;
+    private final CatalogCacheService catalogCacheService;
 
-    public CatalogController(ProductRepository productRepository, CatalogService catalogService) {
+    public CatalogController(ProductRepository productRepository, CatalogService catalogService, CatalogCacheService catalogCacheService) {
         this.productRepository = productRepository;
         this.catalogService = catalogService;
+        this.catalogCacheService = catalogCacheService;
     }
 
     @GetMapping("/{merchantId}")
@@ -36,7 +39,7 @@ public class CatalogController {
                 products = catalogService.searchAndSyncCatalog(q);
             } else {
                 // Default: get local seeded products
-                products = productRepository.findByMerchantId(mid);
+                products = catalogCacheService.getCatalogForMerchant(mid);
             }
 
             if (products.isEmpty()) {
@@ -50,7 +53,7 @@ public class CatalogController {
                 m.put("name", p.getName());
                 m.put("description", p.getDescription());
                 m.put("pricePaise", p.getPricePaise());
-                m.put("stockQuantity", p.getStockQuantity());
+                m.put("stockQuantity", Math.max(0, p.getStockQuantity() - p.getReservedQuantity()));
                 m.put("dietaryTags", p.getDietaryTags() != null ? p.getDietaryTags() : List.of());
                 m.put("allergens", p.getAllergens() != null ? p.getAllergens() : List.of());
                 m.put("deliveryDays", p.getDeliveryDays());

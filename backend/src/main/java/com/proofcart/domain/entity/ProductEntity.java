@@ -1,6 +1,7 @@
 package com.proofcart.domain.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -10,8 +11,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "products")
-
-
+@DynamicUpdate
 public class ProductEntity {
     @Id
     private UUID id;
@@ -30,6 +30,9 @@ public class ProductEntity {
     @Column(name = "stock_quantity", nullable = false)
     private Integer stockQuantity;
 
+    @Column(name = "reserved_quantity", nullable = false, columnDefinition = "integer default 0")
+    private Integer reservedQuantity = 0;
+
     @JdbcTypeCode(SqlTypes.ARRAY)
     @Column(name = "dietary_tags")
     private List<String> dietaryTags;
@@ -46,6 +49,7 @@ public class ProductEntity {
     @Column(name = "subscription_available", nullable = false)
     private Boolean subscriptionAvailable;
 
+    @Version
     @Column(nullable = false)
     private Integer version;
 
@@ -104,6 +108,14 @@ public class ProductEntity {
 
     public void setStockQuantity(Integer stockQuantity) {
         this.stockQuantity = stockQuantity;
+    }
+
+    public Integer getReservedQuantity() {
+        return reservedQuantity == null ? 0 : reservedQuantity;
+    }
+
+    public void setReservedQuantity(Integer reservedQuantity) {
+        this.reservedQuantity = reservedQuantity;
     }
 
     public List<String> getDietaryTags() {

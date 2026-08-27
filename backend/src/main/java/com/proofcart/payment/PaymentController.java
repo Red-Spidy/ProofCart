@@ -2,6 +2,7 @@ package com.proofcart.payment;
 
 import com.proofcart.domain.entity.CheckoutOrderEntity;
 import com.proofcart.domain.repo.CheckoutOrderRepository;
+import com.proofcart.inventory.InventoryReservationService;
 import com.razorpay.Utils;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,9 +20,12 @@ public class PaymentController {
 
     private final CheckoutOrderRepository orderRepo;
     private final String keySecret;
+    private final InventoryReservationService inventory;
 
-    public PaymentController(CheckoutOrderRepository orderRepo, @Value("${razorpay.key.secret:}") String keySecret) {
+    public PaymentController(CheckoutOrderRepository orderRepo, InventoryReservationService inventory,
+                             @Value("${razorpay.key.secret:}") String keySecret) {
         this.orderRepo = orderRepo;
+        this.inventory = inventory;
         this.keySecret = keySecret;
     }
 
@@ -50,11 +54,13 @@ public class PaymentController {
             boolean isValid = Utils.verifyPaymentSignature(options, keySecret);
 
             if (isValid) {
+                inventory.capture(order.getId());
                 order.setRazorpayPaymentId(razorpayPaymentId);
                 order.setStatus("PAID");
                 orderRepo.save(order);
                 return ResponseEntity.ok(Map.of("success", true));
             } else {
+                inventory.release(order.getId(), InventoryReservationService.RELEASED);
                 order.setStatus("FAILED_VERIFICATION");
                 orderRepo.save(order);
                 return ResponseEntity.badRequest().body(Map.of("error", "Invalid payment signature. Payment rejected."));

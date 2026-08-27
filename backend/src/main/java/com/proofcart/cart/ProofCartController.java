@@ -12,7 +12,6 @@ import com.proofcart.domain.repo.IntentContractRepository;
 import com.proofcart.domain.repo.ProductRepository;
 import com.proofcart.domain.repo.ProofCartRepository;
 import com.proofcart.policy.PolicyEngine;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -147,7 +146,7 @@ public class ProofCartController {
 
                 ProductSnapshot snap = new ProductSnapshot(
                         liveP.getId().toString(), liveP.getMerchantId().toString(), liveP.getName(), liveP.getDescription(),
-                        liveP.getPricePaise(), liveP.getStockQuantity(), liveP.getDietaryTags(), liveP.getAllergens(),
+                        liveP.getPricePaise(), Math.max(0, liveP.getStockQuantity() - liveP.getReservedQuantity()), liveP.getDietaryTags(), liveP.getAllergens(),
                         liveP.getDeliveryDays(), liveP.getReturnable(), liveP.getSubscriptionAvailable(), liveP.getVersion(),
                         liveP.getUpdatedAt() != null ? liveP.getUpdatedAt().toString() : null, Instant.now().toString()
                 );

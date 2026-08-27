@@ -3,22 +3,54 @@ package com.proofcart.config;
 import com.proofcart.domain.entity.ProductEntity;
 import com.proofcart.domain.repo.ProductRepository;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
 public class DataSeeder implements CommandLineRunner {
 
     private final ProductRepository productRepository;
+    private final JdbcTemplate jdbcTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
 
-    public DataSeeder(ProductRepository productRepository) {
+    public DataSeeder(ProductRepository productRepository, JdbcTemplate jdbcTemplate, RedisTemplate<String, Object> redisTemplate) {
         this.productRepository = productRepository;
+        this.jdbcTemplate = jdbcTemplate;
+        this.redisTemplate = redisTemplate;
     }
 
     @Override
     public void run(String... args) throws Exception {
+        try {
+            jdbcTemplate.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS reserved_quantity INTEGER NOT NULL DEFAULT 0;");
+            jdbcTemplate.execute("""
+                        CREATE TABLE IF NOT EXISTS inventory_reservations (
+                            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                            order_id UUID NOT NULL,
+                            product_id UUID NOT NULL,
+                            quantity INTEGER NOT NULL,
+                            status VARCHAR(20) NOT NULL,
+                            expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                        );
+                    """);
+        } catch (Exception e) {
+            System.err.println("Schema check/migration notice: " + e.getMessage());
+        }
+
+        try {
+            Set<String> keys = redisTemplate.keys("orderHistory*");
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+            }
+        } catch (Exception ignored) {
+        }
+
         System.out.println("Checking database product count: " + productRepository.count());
         if (productRepository.count() == 0) {
             UUID merchantId = UUID.fromString("10000000-0000-0000-0000-000000000001");

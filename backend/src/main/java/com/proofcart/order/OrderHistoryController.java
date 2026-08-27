@@ -4,7 +4,6 @@ import com.proofcart.domain.entity.CheckoutOrderEntity;
 import com.proofcart.domain.entity.ProofCartEntity;
 import com.proofcart.domain.repo.CheckoutOrderRepository;
 import com.proofcart.domain.repo.ProofCartRepository;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,7 +28,6 @@ public class OrderHistoryController {
     }
 
     @GetMapping
-    @Cacheable(value = "orderHistory", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public Map<String, Object> getOrderHistory() {
         String buyerIdStr = SecurityContextHolder.getContext().getAuthentication().getName();
         UUID buyerId;

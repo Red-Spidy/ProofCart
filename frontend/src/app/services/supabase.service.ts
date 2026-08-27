@@ -43,8 +43,12 @@ export class SupabaseService {
   }
 
   /** Sign up with email and password */
-  async signUp(email: string, password: string) {
-    return this.supabase.auth.signUp({email, password});
+  async signUp(email: string, password: string, name: string, role: 'BUYER' | 'MERCHANT') {
+    return this.supabase.auth.signUp({
+      email,
+      password,
+      options: {data: {display_name: name, marketplace_role: role}}
+    });
   }
 
   /** Sign in with email and password */

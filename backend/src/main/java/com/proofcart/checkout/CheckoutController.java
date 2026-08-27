@@ -10,10 +10,8 @@ import com.proofcart.domain.entity.CheckoutOrderEntity;
 import com.proofcart.domain.entity.IntentContractEntity;
 import com.proofcart.domain.entity.ProductEntity;
 import com.proofcart.domain.entity.ProofCartEntity;
-import com.proofcart.domain.repo.CheckoutOrderRepository;
-import com.proofcart.domain.repo.IntentContractRepository;
-import com.proofcart.domain.repo.ProductRepository;
-import com.proofcart.domain.repo.ProofCartRepository;
+import com.proofcart.domain.repo.*;
+import com.proofcart.inventory.InventoryReservationService;
 import com.proofcart.policy.PolicyEngine;
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
@@ -42,6 +40,8 @@ public class CheckoutController {
     private final CheckoutOrderRepository orderRepo;
     private final ObjectMapper objectMapper;
     private final RazorpayClient razorpayClient;
+    private final InventoryReservationService inventory;
+    private final InventoryReservationRepository reservations;
 
     public CheckoutController(
             ProofCartRepository cartRepo,
@@ -50,6 +50,8 @@ public class CheckoutController {
             PolicyEngine policyEngine,
             CheckoutOrderRepository orderRepo,
             ObjectMapper objectMapper,
+            InventoryReservationService inventory,
+            InventoryReservationRepository reservations,
             @Value("${razorpay.key.id:}") String keyId,
             @Value("${razorpay.key.secret:}") String keySecret) {
         this.cartRepo = cartRepo;
@@ -58,6 +60,8 @@ public class CheckoutController {
         this.policyEngine = policyEngine;
         this.orderRepo = orderRepo;
         this.objectMapper = objectMapper;
+        this.inventory = inventory;
+        this.reservations = reservations;
 
         RazorpayClient client = null;
         try {
@@ -84,6 +88,17 @@ public class CheckoutController {
 
             if (!cart.getApproved()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Cart not approved by buyer"));
+            }
+
+            CheckoutOrderEntity existing = orderRepo.findFirstByCartIdAndStatusOrderByCreatedAtDesc(cartId, "CREATED");
+            if (existing != null) {
+                if (reservations.existsByOrderIdAndStatus(existing.getId(), InventoryReservationService.RESERVED)) {
+                    return ResponseEntity.ok(Map.of(
+                            "orderId", existing.getId(), "razorpayOrderId", existing.getRazorpayOrderId(),
+                            "amountPaise", existing.getAmountPaise()));
+                }
+                existing.setStatus("EXPIRED");
+                orderRepo.save(existing);
             }
 
             // Re-verify policy against current DB state
@@ -141,6 +156,15 @@ public class CheckoutController {
             order.setAmountPaise(cart.getTotalPaise());
             order.setStatus("CREATED");
             orderRepo.save(order);
+
+            try {
+                inventory.reserve(order.getId(), cartItems);
+            } catch (InventoryReservationService.InventoryUnavailableException |
+                     InventoryReservationService.InventoryBusyException e) {
+                order.setStatus("STOCK_UNAVAILABLE");
+                orderRepo.save(order);
+                return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
+            }
 
             return ResponseEntity.ok(Map.of(
                     "orderId", order.getId(),

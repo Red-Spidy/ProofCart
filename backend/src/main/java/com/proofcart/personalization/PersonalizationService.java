@@ -44,7 +44,9 @@ public class PersonalizationService {
     }
 
     public List<Recommendation> recommend(UUID buyerId, UUID merchantId) {
-        List<PersonalizationEventEntity> history = events.findTop200ByBuyerIdOrderByCreatedAtDesc(buyerId);
+        List<PersonalizationEventEntity> history = buyerId == null
+                ? List.of()
+                : events.findTop200ByBuyerIdOrderByCreatedAtDesc(buyerId);
         // History is newest first. A user's most recent opinion is their current one:
         // liking a previously disliked item (and the reverse) takes effect immediately.
         Map<UUID, String> latestFeedback = new HashMap<>();
@@ -67,7 +69,7 @@ public class PersonalizationService {
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
 
         return products.findByMerchantId(merchantId).stream()
-                .filter(p -> p.getStockQuantity() != null && p.getStockQuantity() > 0)
+                .filter(p -> p.getStockQuantity() != null && p.getStockQuantity() - p.getReservedQuantity() > 0)
                 .filter(p -> !disliked.contains(p.getId()))
                 .map(p -> score(p, liked, terms))
                 .sorted(Comparator.comparingInt(Recommendation::score).reversed()

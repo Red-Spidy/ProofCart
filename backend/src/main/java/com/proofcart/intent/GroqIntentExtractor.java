@@ -64,7 +64,7 @@ public class GroqIntentExtractor {
         if (restClient != null) {
             try {
                 var requestBody = Map.of(
-                        "model", "meta-llama/llama-4-scout-17b-16e-instruct",
+                        "model", "llama-3.3-70b-versatile",
                         "messages", List.of(
                                 Map.of("role", "system", "content", SYSTEM_PROMPT),
                                 Map.of("role", "user", "content", prompt)

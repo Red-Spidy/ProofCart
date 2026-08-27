@@ -34,14 +34,25 @@ public class PersonalizationController {
     }
 
     private UUID buyerId(Authentication authentication) {
-        return UUID.fromString((String) authentication.getPrincipal());
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return null;
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof String s && !s.isBlank() && !"anonymousUser".equalsIgnoreCase(s)) {
+            try {
+                return UUID.fromString(s);
+            } catch (IllegalArgumentException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private Map<String, Object> productResponse(ProductEntity p, String reason) {
         return Map.ofEntries(
                 Map.entry("id", p.getId().toString()), Map.entry("merchantId", p.getMerchantId().toString()),
                 Map.entry("name", p.getName()), Map.entry("description", p.getDescription() == null ? "" : p.getDescription()),
-                Map.entry("pricePaise", p.getPricePaise()), Map.entry("stockQuantity", p.getStockQuantity()),
+                Map.entry("pricePaise", p.getPricePaise()), Map.entry("stockQuantity", Math.max(0, p.getStockQuantity() - p.getReservedQuantity())),
                 Map.entry("dietaryTags", p.getDietaryTags() == null ? List.of() : p.getDietaryTags()),
                 Map.entry("allergens", p.getAllergens() == null ? List.of() : p.getAllergens()),
                 Map.entry("deliveryDays", p.getDeliveryDays()), Map.entry("returnable", p.getReturnable()),

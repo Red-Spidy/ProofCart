@@ -5,7 +5,6 @@ import com.proofcart.catalog.openfoodfacts.OpenFoodFactsProductMapper;
 import com.proofcart.catalog.openfoodfacts.OpenFoodFactsResponse;
 import com.proofcart.domain.entity.ProductEntity;
 import com.proofcart.domain.repo.ProductRepository;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -26,7 +25,6 @@ public class CatalogService {
         this.productRepository = productRepository;
     }
 
-    @Cacheable(value = "catalogSearch", key = "#query")
     public List<ProductEntity> searchAndSyncCatalog(String query) {
         // Fetch from external API
         List<OpenFoodFactsResponse.ProductData> apiProducts = openFoodFactsClient.searchProducts(query);

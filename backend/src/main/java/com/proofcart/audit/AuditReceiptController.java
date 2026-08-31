@@ -7,6 +7,7 @@ import com.proofcart.domain.repo.CheckoutOrderRepository;
 import com.proofcart.domain.repo.IntentContractRepository;
 import com.proofcart.domain.repo.ProofCartRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,9 +31,12 @@ public class AuditReceiptController {
     }
 
     @GetMapping("/{orderId}")
-    public ResponseEntity<?> getAuditReceipt(@PathVariable UUID orderId) {
+    public ResponseEntity<?> getAuditReceipt(@PathVariable UUID orderId, Authentication authentication) {
         try {
             CheckoutOrderEntity order = orderRepo.findById(orderId).orElseThrow();
+            if (authentication == null || !order.getBuyerId().toString().equals(authentication.getName())) {
+                return ResponseEntity.status(403).body(Map.of("error", "Access denied."));
+            }
             ProofCartEntity cart = cartRepo.findById(order.getCartId()).orElseThrow();
 
             Object intentDetails = null;

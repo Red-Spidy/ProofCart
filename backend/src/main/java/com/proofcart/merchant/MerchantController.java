@@ -69,6 +69,7 @@ public class MerchantController {
         try {
             Merchant merchant = ownedMerchant(userId(authentication));
             ProductEntity product = new ProductEntity();
+            product.setId(UUID.randomUUID());
             applyProduct(product, request);
             product.setMerchantId(merchant.getId());
             product.setReservedQuantity(0);

@@ -29,6 +29,8 @@ spring:
       port: ${REDIS_PORT:6379}
       username: ${REDIS_USERNAME:default}
       password: ${REDIS_PASSWORD:}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:1s}
+      timeout: ${REDIS_TIMEOUT:1s}
       # If Redis is not reachable or empty, CatalogCacheService falls through to Postgres seamlessly
 
   # ─── CORS for Angular dev server ───────────────────────────────────────────

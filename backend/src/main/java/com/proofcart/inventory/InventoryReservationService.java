@@ -30,6 +30,7 @@ public class InventoryReservationService {
     private static final Duration RESERVATION_TTL = Duration.ofMinutes(10);
     private static final Duration LOCK_TTL = Duration.ofSeconds(8);
     private static final String LOCK_PREFIX = "inventory:lock:";
+    private static final Duration REDIS_RETRY_DELAY = Duration.ofSeconds(30);
     private static final DefaultRedisScript<Long> UNLOCK_SCRIPT = new DefaultRedisScript<>(
             "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end", Long.class);
 
@@ -37,6 +38,7 @@ public class InventoryReservationService {
     private final InventoryReservationRepository reservations;
     private final RedisTemplate<String, Object> redis;
     private final CatalogCacheService catalogCache;
+    private volatile Instant redisRetryAfter = Instant.EPOCH;
 
     public InventoryReservationService(ProductRepository products, InventoryReservationRepository reservations,
                                        RedisTemplate<String, Object> redis, CatalogCacheService catalogCache) {
@@ -129,12 +131,14 @@ public class InventoryReservationService {
     }
 
     private RedisLock tryLock(String productId) {
+        if (Instant.now().isBefore(redisRetryAfter)) return new RedisLock(null, null);
         String key = LOCK_PREFIX + productId;
         String token = UUID.randomUUID().toString();
         try {
             Boolean acquired = redis.opsForValue().setIfAbsent(key, token, LOCK_TTL.toMillis(), TimeUnit.MILLISECONDS);
             return Boolean.TRUE.equals(acquired) ? new RedisLock(key, token) : null;
         } catch (DataAccessException e) {
+            redisRetryAfter = Instant.now().plus(REDIS_RETRY_DELAY);
             return new RedisLock(null, null);
         }
     }

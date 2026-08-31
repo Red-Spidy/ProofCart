@@ -32,7 +32,10 @@ public class CatalogCacheService {
             try {
                 List<ProductEntity> cached = (List<ProductEntity>) redisTemplate.opsForValue().get(key);
                 if (cached != null) {
-                    return cached;
+                    if (cached.stream().allMatch(ProductEntity.class::isInstance)) {
+                        return cached;
+                    }
+                    redisTemplate.delete(key);
                 }
             } catch (Exception e) {
                 markRedisUnavailable(e);

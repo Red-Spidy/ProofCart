@@ -22,9 +22,6 @@ public class AccountController {
         return response(profile);
     }
 
-    /**
-     * Used once after authenticated signup; existing roles can never be escalated through this endpoint.
-     */
     @PostMapping("/profile")
     public Map<String, Object> createProfile(@RequestBody ProfileRequest request, Authentication authentication) {
         Profile profile = accounts.createInitialProfile(userId(authentication), request.name(), request.role());

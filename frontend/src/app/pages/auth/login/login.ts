@@ -3,6 +3,7 @@ import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
 import {Router, RouterLink} from '@angular/router';
 import {SupabaseService} from '../../../services/supabase.service';
+import {MarketplaceService} from '../../../services/marketplace';
 
 @Component({
   selector: 'app-login',
@@ -129,20 +130,30 @@ export class LoginComponent {
   loading = false;
   errorMessage = '';
 
-  constructor(private supabase: SupabaseService, private router: Router) {}
+  constructor(private supabase: SupabaseService, private router: Router, private marketplace: MarketplaceService) {
+  }
 
   async signIn() {
     if (!this.email || !this.password) return;
     this.loading = true;
     this.errorMessage = '';
 
-    const {error} = await this.supabase.signIn(this.email, this.password);
+    const {data, error} = await this.supabase.signIn(this.email, this.password);
 
     if (error) {
       this.errorMessage = error.message;
       this.loading = false;
     } else {
-      this.router.navigate(['/']);
+      // Keep the backend profile in sync for installations where the
+      // Supabase signup trigger was not installed yet. Existing profiles are
+      // intentionally never overwritten by this endpoint.
+      const user = data.user;
+      const role = user?.user_metadata?.['marketplace_role'] === 'MERCHANT' ? 'MERCHANT' : 'BUYER';
+      const name = user?.user_metadata?.['display_name'] || user?.email || 'Shopper';
+      this.marketplace.createProfile(name, role).subscribe({
+        next: () => this.router.navigate(['/']),
+        error: () => this.router.navigate(['/'])
+      });
     }
   }
 }

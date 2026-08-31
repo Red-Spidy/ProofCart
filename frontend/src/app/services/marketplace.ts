@@ -33,6 +33,10 @@ export class MarketplaceService {
     return this.http.get<MarketplaceProfile>('/api/account/me');
   }
 
+  createProfile(name: string, role: 'BUYER' | 'MERCHANT'): Observable<MarketplaceProfile> {
+    return this.http.post<MarketplaceProfile>('/api/account/profile', {name, role});
+  }
+
   sellerDashboard(): Observable<any> {
     return this.http.get('/api/merchant/dashboard');
   }

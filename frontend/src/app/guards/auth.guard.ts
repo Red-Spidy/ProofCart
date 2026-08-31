@@ -35,3 +35,18 @@ export const guestGuard: CanActivateFn = () => {
     })
   );
 };
+
+/** Seller console must not be entered by buyer accounts. */
+export const sellerGuard: CanActivateFn = () => {
+  const supabase = inject(SupabaseService);
+  const router = inject(Router);
+  return from(supabase.getAccessToken()).pipe(
+    take(1),
+    map(token => {
+      const role = supabase.currentUser?.user_metadata?.['marketplace_role'];
+      if (token && role === 'MERCHANT') return true;
+      router.navigate(['/']);
+      return false;
+    })
+  );
+};

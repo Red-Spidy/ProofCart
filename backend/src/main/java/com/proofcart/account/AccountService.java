@@ -19,6 +19,15 @@ public class AccountService {
     }
 
     public Profile createInitialProfile(UUID userId, String name, String requestedRole) {
+        Profile existing = profiles.findById(userId).orElse(null);
+        if (existing != null) {
+            if ("BUYER".equals(existing.getRole()) && "MERCHANT".equalsIgnoreCase(requestedRole)) {
+                existing.setRole("MERCHANT");
+                if (name != null && !name.isBlank()) existing.setName(normalizeName(name));
+                return profiles.save(existing);
+            }
+            return existing;
+        }
         return profiles.findById(userId).orElseGet(() -> {
             Profile profile = new Profile();
             profile.setId(userId);

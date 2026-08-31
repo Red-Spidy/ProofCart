@@ -1,6 +1,7 @@
 package com.proofcart.cart;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.proofcart.audit.AuditEventService;
 import com.proofcart.domain.CartItem;
 import com.proofcart.domain.IntentRules;
 import com.proofcart.domain.PolicyResult;
@@ -29,13 +30,15 @@ public class ProofCartController {
     private final IntentContractRepository intentContractRepository;
     private final PolicyEngine policyEngine;
     private final ObjectMapper objectMapper;
+    private final AuditEventService audit;
 
-    public ProofCartController(ProofCartRepository proofCartRepository, ProductRepository productRepository, IntentContractRepository intentContractRepository, PolicyEngine policyEngine, ObjectMapper objectMapper) {
+    public ProofCartController(ProofCartRepository proofCartRepository, ProductRepository productRepository, IntentContractRepository intentContractRepository, PolicyEngine policyEngine, ObjectMapper objectMapper, AuditEventService audit) {
         this.proofCartRepository = proofCartRepository;
         this.productRepository = productRepository;
         this.intentContractRepository = intentContractRepository;
         this.policyEngine = policyEngine;
         this.objectMapper = objectMapper;
+        this.audit = audit;
     }
 
     // ─── GET /api/proof-carts/{id} ───────────────────────────────────────────
@@ -173,6 +176,7 @@ public class ProofCartController {
             cart.setApproved(false);
 
             ProofCartEntity saved = proofCartRepository.save(cart);
+            audit.record(buyerId, merchantId, saved.getId(), null, "CART_EVALUATED", "Proof cart evaluated: " + result.decision().name());
 
             return ResponseEntity.ok(Map.of(
                     "id", saved.getId(),
@@ -202,6 +206,7 @@ public class ProofCartController {
         }
         cart.setApproved(true);
         proofCartRepository.save(cart);
+        audit.record(cart.getBuyerId(), cart.getMerchantId(), cart.getId(), null, "CART_APPROVED", "Buyer explicitly approved the proof cart.");
         return ResponseEntity.ok(Map.of("success", true));
     }
 

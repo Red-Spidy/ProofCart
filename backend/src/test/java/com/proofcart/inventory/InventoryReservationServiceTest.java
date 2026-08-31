@@ -13,6 +13,8 @@ import org.springframework.test.context.support.DependencyInjectionTestExecution
 import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE,
         properties = {"supabase.url=", "spring.task.scheduling.enabled=false"})
 @TestExecutionListeners(listeners = DependencyInjectionTestExecutionListener.class,

@@ -28,6 +28,11 @@ public class McpTokenAuthenticationFilter extends OncePerRequestFilter {
      */
     @Value("${mcp.valid.token.hash:}")
     private String validTokenHash;
+    private final AgentTokenService agentTokens;
+
+    public McpTokenAuthenticationFilter(AgentTokenService agentTokens) {
+        this.agentTokens = agentTokens;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -35,6 +40,16 @@ public class McpTokenAuthenticationFilter extends OncePerRequestFilter {
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String rawToken = authHeader.substring(7);
+
+            var agentToken = agentTokens.authenticate(rawToken);
+            if (agentToken.isPresent()) {
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                        agentToken.get().getBuyerId().toString(), null, Collections.emptyList());
+                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             String tokenHash = hashToken(rawToken);
 

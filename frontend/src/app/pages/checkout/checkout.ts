@@ -2,6 +2,7 @@ import {Component, OnInit} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {ActivatedRoute, Router} from '@angular/router';
 import {CartService} from '../../services/cart';
+import {environment} from '../../../environments/environment';
 
 // Declare Razorpay global
 declare var Razorpay: any;
@@ -83,7 +84,7 @@ export class CheckoutComponent implements OnInit {
 
   openRazorpay() {
     const options = {
-      key: 'rzp_test_TU9MeiRpMwEZmq',
+      key: environment.razorpayKeyId,
       amount: this.amountPaise,
       currency: 'INR',
       name: 'NutriBasket',

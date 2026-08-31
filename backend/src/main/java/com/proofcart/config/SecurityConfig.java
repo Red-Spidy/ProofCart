@@ -40,7 +40,7 @@ public class SecurityConfig {
                         // Public: Recommendations & Personalization signals
                         .requestMatchers("/api/personalization/**").permitAll()
                         // Public: Intent parsing (entry point of the flow)
-                        .requestMatchers("/api/intents/**").permitAll()
+                        .requestMatchers("/api/intents/**").authenticated()
                         // Public: Razorpay webhooks (Razorpay calls this server-to-server)
                         .requestMatchers("/api/webhooks/**").permitAll()
                         // MCP: authenticated only

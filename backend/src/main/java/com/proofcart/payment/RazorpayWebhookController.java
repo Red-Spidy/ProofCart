@@ -2,11 +2,15 @@ package com.proofcart.payment;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.proofcart.audit.AuditEventService;
 import com.proofcart.domain.entity.CheckoutOrderEntity;
+import com.proofcart.domain.entity.WebhookEventEntity;
 import com.proofcart.domain.repo.CheckoutOrderRepository;
+import com.proofcart.domain.repo.WebhookEventRepository;
 import com.proofcart.inventory.InventoryReservationService;
 import com.razorpay.Utils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,13 +24,17 @@ public class RazorpayWebhookController {
     private final ObjectMapper objectMapper;
     private final String webhookSecret;
     private final InventoryReservationService inventory;
+    private final WebhookEventRepository webhookEvents;
+    private final AuditEventService audit;
 
     public RazorpayWebhookController(CheckoutOrderRepository orderRepo,
                                      ObjectMapper objectMapper, InventoryReservationService inventory,
-                                     @Value("${razorpay.webhook.secret:}") String webhookSecret) {
+                                     @Value("${razorpay.webhook.secret:}") String webhookSecret, WebhookEventRepository webhookEvents, AuditEventService audit) {
         this.orderRepo = orderRepo;
         this.objectMapper = objectMapper;
         this.inventory = inventory;
+        this.webhookEvents = webhookEvents;
+        this.audit = audit;
         this.webhookSecret = webhookSecret;
     }
 
@@ -53,6 +61,15 @@ public class RazorpayWebhookController {
             // Parse the event
             JsonNode root = objectMapper.readTree(payload);
             String event = root.path("event").asText();
+            String eventId = root.path("id").asText(null);
+            if (eventId == null || eventId.isBlank())
+                return ResponseEntity.badRequest().body("Missing webhook event id.");
+            if (webhookEvents.existsById(eventId)) return ResponseEntity.ok(Map.of("status", "already_processed"));
+            try {
+                webhookEvents.saveAndFlush(new WebhookEventEntity(eventId, event));
+            } catch (DataIntegrityViolationException duplicate) {
+                return ResponseEntity.ok(Map.of("status", "already_processed"));
+            }
 
             if ("payment.captured".equals(event)) {
                 String razorpayOrderId = root.path("payload").path("payment").path("entity").path("order_id").asText();
@@ -66,6 +83,7 @@ public class RazorpayWebhookController {
                         order.setRazorpayPaymentId(razorpayPaymentId);
                         order.setStatus("PAID");
                         orderRepo.save(order);
+                        audit.record(order.getBuyerId(), order.getMerchantId(), order.getCartId(), order.getId(), "PAYMENT_CAPTURED", "Razorpay capture webhook processed.");
                         System.out.println("[webhook] Marked order " + razorpayOrderId + " as PAID via webhook.");
                     }
                 }
@@ -76,6 +94,7 @@ public class RazorpayWebhookController {
                     inventory.release(order.getId(), InventoryReservationService.RELEASED);
                     order.setStatus("FAILED");
                     orderRepo.save(order);
+                    audit.record(order.getBuyerId(), order.getMerchantId(), order.getCartId(), order.getId(), "PAYMENT_FAILED", "Razorpay failure webhook processed.");
                     System.out.println("[webhook] Marked order " + razorpayOrderId + " as FAILED via webhook.");
                 }
             } else {

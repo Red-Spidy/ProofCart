@@ -2,6 +2,7 @@ package com.proofcart.checkout;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.proofcart.audit.AuditEventService;
 import com.proofcart.domain.CartItem;
 import com.proofcart.domain.IntentRules;
 import com.proofcart.domain.PolicyResult;
@@ -42,6 +43,7 @@ public class CheckoutController {
     private final RazorpayClient razorpayClient;
     private final InventoryReservationService inventory;
     private final InventoryReservationRepository reservations;
+    private final AuditEventService audit;
 
     public CheckoutController(
             ProofCartRepository cartRepo,
@@ -53,7 +55,8 @@ public class CheckoutController {
             InventoryReservationService inventory,
             InventoryReservationRepository reservations,
             @Value("${razorpay.key.id:}") String keyId,
-            @Value("${razorpay.key.secret:}") String keySecret) {
+            @Value("${razorpay.key.secret:}") String keySecret,
+            AuditEventService audit) {
         this.cartRepo = cartRepo;
         this.productRepo = productRepo;
         this.intentRepo = intentRepo;
@@ -62,6 +65,7 @@ public class CheckoutController {
         this.objectMapper = objectMapper;
         this.inventory = inventory;
         this.reservations = reservations;
+        this.audit = audit;
 
         RazorpayClient client = null;
         try {
@@ -156,6 +160,7 @@ public class CheckoutController {
             order.setAmountPaise(cart.getTotalPaise());
             order.setStatus("CREATED");
             orderRepo.save(order);
+            audit.record(order.getBuyerId(), order.getMerchantId(), order.getCartId(), order.getId(), "CHECKOUT_CREATED", "Razorpay checkout order created.");
 
             try {
                 inventory.reserve(order.getId(), cartItems);

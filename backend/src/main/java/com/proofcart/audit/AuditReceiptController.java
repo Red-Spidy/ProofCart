@@ -23,11 +23,13 @@ public class AuditReceiptController {
     private final CheckoutOrderRepository orderRepo;
     private final ProofCartRepository cartRepo;
     private final IntentContractRepository intentRepo;
+    private final AuditEventService audit;
 
-    public AuditReceiptController(CheckoutOrderRepository orderRepo, ProofCartRepository cartRepo, IntentContractRepository intentRepo) {
+    public AuditReceiptController(CheckoutOrderRepository orderRepo, ProofCartRepository cartRepo, IntentContractRepository intentRepo, AuditEventService audit) {
         this.orderRepo = orderRepo;
         this.cartRepo = cartRepo;
         this.intentRepo = intentRepo;
+        this.audit = audit;
     }
 
     @GetMapping("/{orderId}")
@@ -62,6 +64,7 @@ public class AuditReceiptController {
                             "policyChecks", cart.getPolicyChecksJson(),
                             "approvedByBuyer", cart.getApproved()
                     ),
+                    "events", audit.forOrder(orderId),
                     "intent", intentDetails != null ? intentDetails : "Direct cart purchase"
             ));
         } catch (Exception e) {

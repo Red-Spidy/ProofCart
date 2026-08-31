@@ -1,5 +1,6 @@
 package com.proofcart.payment;
 
+import com.proofcart.audit.AuditEventService;
 import com.proofcart.domain.entity.CheckoutOrderEntity;
 import com.proofcart.domain.repo.CheckoutOrderRepository;
 import com.proofcart.inventory.InventoryReservationService;
@@ -21,12 +22,14 @@ public class PaymentController {
     private final CheckoutOrderRepository orderRepo;
     private final String keySecret;
     private final InventoryReservationService inventory;
+    private final AuditEventService audit;
 
     public PaymentController(CheckoutOrderRepository orderRepo, InventoryReservationService inventory,
-                             @Value("${razorpay.key.secret:}") String keySecret) {
+                             @Value("${razorpay.key.secret:}") String keySecret, AuditEventService audit) {
         this.orderRepo = orderRepo;
         this.inventory = inventory;
         this.keySecret = keySecret;
+        this.audit = audit;
     }
 
     @PostMapping("/verify")
@@ -58,11 +61,13 @@ public class PaymentController {
                 order.setRazorpayPaymentId(razorpayPaymentId);
                 order.setStatus("PAID");
                 orderRepo.save(order);
+                audit.record(order.getBuyerId(), order.getMerchantId(), order.getCartId(), order.getId(), "PAYMENT_VERIFIED", "Razorpay payment signature verified.");
                 return ResponseEntity.ok(Map.of("success", true));
             } else {
                 inventory.release(order.getId(), InventoryReservationService.RELEASED);
                 order.setStatus("FAILED_VERIFICATION");
                 orderRepo.save(order);
+                audit.record(order.getBuyerId(), order.getMerchantId(), order.getCartId(), order.getId(), "PAYMENT_REJECTED", "Razorpay payment signature rejected.");
                 return ResponseEntity.badRequest().body(Map.of("error", "Invalid payment signature. Payment rejected."));
             }
         } catch (Exception e) {

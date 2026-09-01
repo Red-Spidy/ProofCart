@@ -1,5 +1,10 @@
 package com.proofcart.audit;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.proofcart.domain.CartItem;
+import com.proofcart.domain.PolicyCheck;
 import com.proofcart.domain.entity.CheckoutOrderEntity;
 import com.proofcart.domain.entity.IntentContractEntity;
 import com.proofcart.domain.entity.ProofCartEntity;
@@ -13,6 +18,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -24,12 +31,14 @@ public class AuditReceiptController {
     private final ProofCartRepository cartRepo;
     private final IntentContractRepository intentRepo;
     private final AuditEventService audit;
+    private final ObjectMapper objectMapper;
 
-    public AuditReceiptController(CheckoutOrderRepository orderRepo, ProofCartRepository cartRepo, IntentContractRepository intentRepo, AuditEventService audit) {
+    public AuditReceiptController(CheckoutOrderRepository orderRepo, ProofCartRepository cartRepo, IntentContractRepository intentRepo, AuditEventService audit, ObjectMapper objectMapper) {
         this.orderRepo = orderRepo;
         this.cartRepo = cartRepo;
         this.intentRepo = intentRepo;
         this.audit = audit;
+        this.objectMapper = objectMapper;
     }
 
     @GetMapping("/{orderId}")
@@ -44,35 +53,45 @@ public class AuditReceiptController {
             Object intentDetails = null;
             if (cart.getIntentContractId() != null) {
                 IntentContractEntity intent = intentRepo.findById(cart.getIntentContractId()).orElseThrow();
-                intentDetails = Map.of(
-                        "prompt", intent.getRawPrompt(),
-                        "extractedRules", intent.getExtractedRulesJson(),
-                        "confidence", intent.getConfidence()
-                );
+                Map<String, Object> details = new LinkedHashMap<>();
+                details.put("prompt", intent.getRawPrompt());
+                // Parse the stored JSON text into a real object — sending the raw string here
+                // was the source of the mangled, double-escaped rules blob on the receipt page.
+                details.put("rules", objectMapper.readValue(intent.getExtractedRulesJson(), JsonNode.class));
+                details.put("confidence", intent.getConfidence());
+                intentDetails = details;
             }
+
+            List<CartItem> items = objectMapper.readValue(cart.getSnapshotDataJson(), new TypeReference<List<CartItem>>() {
+            });
+            List<PolicyCheck> policyChecks = objectMapper.readValue(cart.getPolicyChecksJson(), new TypeReference<List<PolicyCheck>>() {
+            });
 
             // The full chain for this cart (intent → cart evaluation → approval → checkout →
             // payment) — not just events that happen to carry this orderId, so nothing the buyer
             // did before checkout existed silently drops out of their receipt.
             AuditEventService.ChainVerification verification = audit.verifyChain(cart.getId());
 
-            return ResponseEntity.ok(Map.of(
-                    "orderId", order.getId(),
-                    "status", order.getStatus(),
-                    "amountPaise", order.getAmountPaise(),
-                    "razorpayOrderId", order.getRazorpayOrderId(),
-                    "razorpayPaymentId", order.getRazorpayPaymentId() != null ? order.getRazorpayPaymentId() : "Pending",
-                    "proofCart", Map.of(
-                            "id", cart.getId(),
-                            "offerHash", cart.getOfferHash(),
-                            "policyDecision", cart.getPolicyDecision(),
-                            "policyChecks", cart.getPolicyChecksJson(),
-                            "approvedByBuyer", cart.getApproved()
-                    ),
-                    "events", audit.forCart(cart.getId()),
-                    "chain", chainResponse(verification),
-                    "intent", intentDetails != null ? intentDetails : "Direct cart purchase"
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("orderId", order.getId());
+            response.put("status", order.getStatus());
+            response.put("createdAt", order.getCreatedAt());
+            response.put("amountPaise", order.getAmountPaise());
+            response.put("razorpayOrderId", order.getRazorpayOrderId());
+            response.put("razorpayPaymentId", order.getRazorpayPaymentId() != null ? order.getRazorpayPaymentId() : "Pending");
+            response.put("items", items);
+            response.put("proofCart", Map.of(
+                    "id", cart.getId(),
+                    "offerHash", cart.getOfferHash(),
+                    "policyDecision", cart.getPolicyDecision(),
+                    "policyChecks", policyChecks,
+                    "approvedByBuyer", cart.getApproved()
             ));
+            response.put("events", audit.forCart(cart.getId()));
+            response.put("chain", chainResponse(verification));
+            response.put("intent", intentDetails != null ? intentDetails : "Direct cart purchase");
+
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }

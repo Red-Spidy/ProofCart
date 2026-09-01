@@ -36,6 +36,31 @@ import {PolicyBadgeComponent} from '../../components/policy-badge/policy-badge';
               </div>
             </div>
           </div>
+
+          <!-- Upsell: cross-sell agent -->
+          <div class="upsell-section" *ngIf="suggestions.length">
+            <h3>🛍️ You might also like</h3>
+            <div class="upsell-list">
+              <div class="upsell-card glass-panel" *ngFor="let s of suggestions">
+                <div class="upsell-info">
+                  <strong>{{ s.name }}</strong>
+                  <span class="upsell-reason">{{ s.reason }}</span>
+                  <div class="tags" *ngIf="s.dietaryTags?.length">
+                    <span class="badge badge-info" *ngFor="let tag of s.dietaryTags">{{ tag }}</span>
+                  </div>
+                </div>
+                <div class="upsell-action">
+                  <strong>₹{{ (s.pricePaise / 100) }}</strong>
+                  <button
+                    class="btn btn-secondary btn-sm"
+                    (click)="addSuggestion(s)"
+                    [disabled]="addingId === s.productId">
+                    {{ addingId === s.productId ? 'Adding…' : '+ Add' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Right Column: Policy & Decision -->
@@ -173,6 +198,60 @@ import {PolicyBadgeComponent} from '../../components/policy-badge/policy-badge';
       color: var(--accent-blue-light);
     }
 
+    /* ── Upsell ──────── */
+    .upsell-section {
+      margin-top: 2rem;
+    }
+
+    .upsell-section h3 {
+      font-size: 1.125rem;
+      margin-bottom: 1rem;
+      color: var(--text-secondary);
+    }
+
+    .upsell-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .upsell-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.875rem 1.125rem;
+    }
+
+    .upsell-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .upsell-info strong {
+      font-size: 1rem;
+      color: var(--text-primary);
+    }
+
+    .upsell-reason {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+    }
+
+    .upsell-action {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    .upsell-action strong {
+      font-size: 1rem;
+      color: var(--accent-blue-light);
+    }
+
     /* ── Right Column (Sidebar) ── */
     .decision-card {
       display: flex;
@@ -271,7 +350,7 @@ import {PolicyBadgeComponent} from '../../components/policy-badge/policy-badge';
       text-align: center;
       padding: 4rem 2rem;
     }
-    
+
     @media (max-width: 800px) {
       .cart-layout {
         grid-template-columns: 1fr;
@@ -284,6 +363,8 @@ export class CartReviewComponent implements OnInit {
   cart: any = null;
   loading = false;
   loadingCart = false;
+  suggestions: any[] = [];
+  addingId: string | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -304,13 +385,47 @@ export class CartReviewComponent implements OnInit {
         next: (cartData) => {
           this.cart = cartData;
           this.loadingCart = false;
+          this.loadUpsell();
         },
         error: () => {
           this.loadingCart = false;
           this.router.navigate(['/']);
         }
       });
+    } else {
+      this.loadUpsell();
     }
+  }
+
+  loadUpsell() {
+    if (!this.cart || this.cart.policyResult?.decision !== 'ALLOWED') {
+      this.suggestions = [];
+      return;
+    }
+    this.cartService.getUpsellSuggestions(this.cartId).subscribe({
+      next: (res) => (this.suggestions = res.suggestions || []),
+      error: () => (this.suggestions = [])
+    });
+  }
+
+  addSuggestion(suggestion: any) {
+    this.addingId = suggestion.productId;
+    this.cartService.addCartItem(this.cartId, suggestion.productId).subscribe({
+      next: (updated) => {
+        this.cart = {
+          ...this.cart,
+          items: updated.items,
+          policyResult: updated.policyResult,
+          offerHash: updated.offerHash
+        };
+        this.addingId = null;
+        this.loadUpsell();
+      },
+      error: (err) => {
+        console.error('Add suggestion error:', err);
+        this.addingId = null;
+      }
+    });
   }
 
   goBack() {

@@ -26,6 +26,14 @@ export class CartService {
     return this.http.post(`${this.apiUrl}/proof-carts/${cartId}/approve`, {});
   }
 
+  getUpsellSuggestions(cartId: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/proof-carts/${cartId}/upsell`);
+  }
+
+  addCartItem(cartId: string, productId: string, quantity: number = 1): Observable<any> {
+    return this.http.post(`${this.apiUrl}/proof-carts/${cartId}/items`, {productId, quantity});
+  }
+
   createCheckout(cartId: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/checkout/create`, {cartId});
   }

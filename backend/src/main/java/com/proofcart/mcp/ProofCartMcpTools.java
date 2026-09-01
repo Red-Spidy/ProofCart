@@ -2,6 +2,8 @@ package com.proofcart.mcp;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.proofcart.catalog.CatalogService;
+import com.proofcart.domain.CartItem;
+import com.proofcart.domain.IntentRules;
 import com.proofcart.domain.entity.CheckoutOrderEntity;
 import com.proofcart.domain.entity.IntentContractEntity;
 import com.proofcart.domain.entity.ProductEntity;
@@ -11,6 +13,7 @@ import com.proofcart.domain.repo.IntentContractRepository;
 import com.proofcart.domain.repo.ProductRepository;
 import com.proofcart.domain.repo.ProofCartRepository;
 import com.proofcart.intent.GroqIntentExtractor;
+import com.proofcart.upsell.UpsellService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,15 +36,18 @@ public class ProofCartMcpTools {
     private final ProofCartRepository carts;
     private final CheckoutOrderRepository orders;
     private final ObjectMapper mapper;
+    private final UpsellService upsell;
 
-    public ProofCartMcpTools(ProductRepository products, CatalogService catalog, GroqIntentExtractor intents, IntentContractRepository contracts, ProofCartRepository carts, CheckoutOrderRepository orders, ObjectMapper mapper) {
+    public ProofCartMcpTools(ProductRepository products, CatalogService catalog, GroqIntentExtractor intents, IntentContractRepository contracts, ProofCartRepository carts, CheckoutOrderRepository orders, ObjectMapper mapper, UpsellService upsell) {
         this.products = products;
         this.catalog = catalog;
         this.intents = intents;
         this.contracts = contracts;
         this.carts = carts;
         this.orders = orders;
-        this.mapper = mapper; }
+        this.mapper = mapper;
+        this.upsell = upsell;
+    }
 
     @PostMapping
     public ResponseEntity<?> handle(@RequestBody Map<String, Object> request, Authentication auth) {
@@ -55,6 +61,7 @@ public class ProofCartMcpTools {
                 case "create_intent_contract" -> createIntent(args, UUID.fromString(auth.getName()));
                 case "evaluate_proof_cart" -> evaluate(args, UUID.fromString(auth.getName()));
                 case "create_checkout_review" -> checkoutReview(args, UUID.fromString(auth.getName()));
+                case "suggest_upsell" -> suggestUpsell(args, UUID.fromString(auth.getName()));
                 case "get_audit_receipt" -> receipt(args, UUID.fromString(auth.getName()));
                 default -> throw new IllegalArgumentException("Unknown tool: " + name);
             };
@@ -112,6 +119,17 @@ public class ProofCartMcpTools {
         ProofCartEntity c = ownedCart(args, buyerId);
         if (!"ALLOWED".equals(c.getPolicyDecision())) throw new IllegalArgumentException("Cart is not allowed");
         return Map.of("cartId", c.getId(), "reviewUrl", "/checkout/" + c.getId(), "requiresBuyerApproval", !Boolean.TRUE.equals(c.getApproved()));
+    }
+
+    private Object suggestUpsell(Map<String, Object> args, UUID buyerId) throws Exception {
+        ProofCartEntity c = ownedCart(args, buyerId);
+        if (!"ALLOWED".equals(c.getPolicyDecision())) return Map.of("suggestions", List.of());
+        List<CartItem> items = mapper.readValue(c.getSnapshotDataJson(),
+                mapper.getTypeFactory().constructCollectionType(List.class, CartItem.class));
+        IntentRules rules = c.getIntentContractId() == null
+                ? new IntentRules(null, List.of(), List.of(), null, true, false, false, null, 1.0)
+                : mapper.readValue(contracts.findById(c.getIntentContractId()).orElseThrow().getExtractedRulesJson(), IntentRules.class);
+        return Map.of("cartId", c.getId(), "suggestions", upsell.suggest(c.getMerchantId(), items, c.getTotalPaise(), rules));
     }
 
     private Object receipt(Map<String, Object> args, UUID buyerId) {

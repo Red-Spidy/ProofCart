@@ -13,6 +13,7 @@ import com.proofcart.domain.repo.IntentContractRepository;
 import com.proofcart.domain.repo.ProductRepository;
 import com.proofcart.domain.repo.ProofCartRepository;
 import com.proofcart.policy.PolicyEngine;
+import com.proofcart.upsell.UpsellService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -31,14 +32,16 @@ public class ProofCartController {
     private final PolicyEngine policyEngine;
     private final ObjectMapper objectMapper;
     private final AuditEventService audit;
+    private final UpsellService upsellService;
 
-    public ProofCartController(ProofCartRepository proofCartRepository, ProductRepository productRepository, IntentContractRepository intentContractRepository, PolicyEngine policyEngine, ObjectMapper objectMapper, AuditEventService audit) {
+    public ProofCartController(ProofCartRepository proofCartRepository, ProductRepository productRepository, IntentContractRepository intentContractRepository, PolicyEngine policyEngine, ObjectMapper objectMapper, AuditEventService audit, UpsellService upsellService) {
         this.proofCartRepository = proofCartRepository;
         this.productRepository = productRepository;
         this.intentContractRepository = intentContractRepository;
         this.policyEngine = policyEngine;
         this.objectMapper = objectMapper;
         this.audit = audit;
+        this.upsellService = upsellService;
     }
 
     // ─── GET /api/proof-carts/{id} ───────────────────────────────────────────
@@ -208,6 +211,119 @@ public class ProofCartController {
         proofCartRepository.save(cart);
         audit.record(cart.getBuyerId(), cart.getMerchantId(), cart.getId(), null, "CART_APPROVED", "Buyer explicitly approved the proof cart.");
         return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    // ─── GET /api/proof-carts/{id}/upsell ───────────────────────────────────
+
+    @GetMapping("/{id}/upsell")
+    public ResponseEntity<?> getUpsellSuggestions(@PathVariable UUID id) {
+        try {
+            ProofCartEntity cart = proofCartRepository.findById(id).orElseThrow();
+            String buyerId = getAuthenticatedBuyerId();
+            if (buyerId != null && !cart.getBuyerId().toString().equals(buyerId)) {
+                return ResponseEntity.status(403).body(Map.of("error", "Access denied."));
+            }
+            // Only pitch add-ons once the cart itself is safe to check out.
+            if (!"ALLOWED".equals(cart.getPolicyDecision())) {
+                return ResponseEntity.ok(Map.of("suggestions", List.of()));
+            }
+
+            List<CartItem> items = objectMapper.readValue(cart.getSnapshotDataJson(),
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, CartItem.class));
+            IntentRules rules = loadRules(cart.getIntentContractId());
+            var suggestions = upsellService.suggest(cart.getMerchantId(), items, cart.getTotalPaise(), rules);
+            if (!suggestions.isEmpty()) {
+                audit.record(cart.getBuyerId(), cart.getMerchantId(), cart.getId(), null, "UPSELL_SUGGESTED",
+                        "Suggested " + suggestions.size() + " add-on product(s).");
+            }
+            return ResponseEntity.ok(Map.of("suggestions", suggestions));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // ─── POST /api/proof-carts/{id}/items ───────────────────────────────────
+
+    @PostMapping("/{id}/items")
+    public ResponseEntity<?> addItem(@PathVariable UUID id, @RequestBody Map<String, Object> request) {
+        try {
+            ProofCartEntity cart = proofCartRepository.findById(id).orElseThrow();
+            String buyerId = getAuthenticatedBuyerId();
+            if (buyerId != null && !cart.getBuyerId().toString().equals(buyerId)) {
+                return ResponseEntity.status(403).body(Map.of("error", "Access denied."));
+            }
+            if (request.get("productId") == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "productId is required."));
+            }
+            UUID productId = UUID.fromString(request.get("productId").toString());
+            int qty = request.get("quantity") == null ? 1 : ((Number) request.get("quantity")).intValue();
+            if (qty <= 0) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Quantity must be a positive integer."));
+            }
+
+            List<CartItem> items = new ArrayList<>(objectMapper.readValue(cart.getSnapshotDataJson(),
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, CartItem.class)));
+            if (items.stream().anyMatch(i -> i.productId().equals(productId.toString()))) {
+                return ResponseEntity.badRequest().body(Map.of("error", "That item is already in the cart."));
+            }
+
+            ProductEntity liveP = productRepository.findById(productId)
+                    .orElseThrow(() -> new IllegalArgumentException("Product not found."));
+            if (!liveP.getMerchantId().equals(cart.getMerchantId())) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Product belongs to a different merchant."));
+            }
+
+            ProductSnapshot snap = new ProductSnapshot(
+                    liveP.getId().toString(), liveP.getMerchantId().toString(), liveP.getName(), liveP.getDescription(),
+                    liveP.getPricePaise(), Math.max(0, liveP.getStockQuantity() - liveP.getReservedQuantity()), liveP.getDietaryTags(), liveP.getAllergens(),
+                    liveP.getDeliveryDays(), liveP.getReturnable(), liveP.getSubscriptionAvailable(), liveP.getVersion(),
+                    liveP.getUpdatedAt() != null ? liveP.getUpdatedAt().toString() : null, Instant.now().toString()
+            );
+            int lineTotal = liveP.getPricePaise() * qty;
+            items.add(new CartItem(productId.toString(), qty, liveP.getPricePaise(), lineTotal, snap));
+            int newTotal = items.stream().mapToInt(CartItem::lineTotalPaise).sum();
+
+            IntentRules rules = loadRules(cart.getIntentContractId());
+            String expiresAt = cart.getIntentContractId() == null ? null
+                    : intentContractRepository.findById(cart.getIntentContractId()).orElseThrow().getExpiresAt().toString();
+
+            // Re-run the same policy engine used at checkout — an accepted upsell must earn its
+            // place in the cart just like every other item, it is never force-added.
+            PolicyEngine.PolicyEngineInput input = new PolicyEngine.PolicyEngineInput(
+                    rules, items, newTotal, cart.getMerchantId().toString(), expiresAt, null, null
+            );
+            PolicyResult result = policyEngine.runPolicyEngine(input);
+            String offerHash = policyEngine.computeOfferHash(items, newTotal);
+
+            cart.setTotalPaise(newTotal);
+            cart.setOfferHash(offerHash);
+            cart.setSnapshotDataJson(objectMapper.writeValueAsString(items));
+            cart.setPolicyDecision(result.decision().name());
+            cart.setPolicyChecksJson(objectMapper.writeValueAsString(result.checks()));
+            cart.setApproved(false); // cart content changed — buyer must approve again
+            ProofCartEntity saved = proofCartRepository.save(cart);
+            audit.record(cart.getBuyerId(), cart.getMerchantId(), cart.getId(), null, "UPSELL_ACCEPTED",
+                    "Buyer added suggested item \"" + liveP.getName() + "\" to the cart.");
+
+            return ResponseEntity.ok(Map.of(
+                    "id", saved.getId(),
+                    "policyResult", result,
+                    "offerHash", offerHash,
+                    "items", items
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private IntentRules loadRules(UUID intentContractId) throws Exception {
+        if (intentContractId == null) {
+            return new IntentRules(null, List.of(), List.of(), null, true, false, false, null, 1.0);
+        }
+        IntentContractEntity intent = intentContractRepository.findById(intentContractId).orElseThrow();
+        return objectMapper.readValue(intent.getExtractedRulesJson(), IntentRules.class);
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────

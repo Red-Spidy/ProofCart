@@ -10,7 +10,10 @@ import java.util.UUID;
 
 @Repository
 public interface CheckoutOrderRepository extends JpaRepository<CheckoutOrderEntity, UUID> {
-    CheckoutOrderEntity findByRazorpayOrderId(String razorpayOrderId);
+    // A market order shares one razorpayOrderId across several merchants' sub-orders, so this
+    // returns every CheckoutOrderEntity collected under that payment — a single-merchant
+    // checkout is simply the common case where the list has exactly one element.
+    List<CheckoutOrderEntity> findByRazorpayOrderId(String razorpayOrderId);
 
     CheckoutOrderEntity findFirstByCartIdAndStatusOrderByCreatedAtDesc(UUID cartId, String status);
     List<CheckoutOrderEntity> findByBuyerIdOrderByCreatedAtDesc(UUID buyerId);

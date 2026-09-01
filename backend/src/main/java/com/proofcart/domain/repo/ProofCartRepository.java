@@ -10,4 +10,6 @@ import java.util.UUID;
 @Repository
 public interface ProofCartRepository extends JpaRepository<ProofCartEntity, UUID> {
     List<ProofCartEntity> findByBuyerIdOrderByCreatedAtDesc(UUID buyerId);
+
+    List<ProofCartEntity> findByIntentContractIdAndBuyerId(UUID intentContractId, UUID buyerId);
 }

@@ -3,6 +3,7 @@ package com.proofcart.payment;
 import com.proofcart.audit.AuditEventService;
 import com.proofcart.domain.entity.CheckoutOrderEntity;
 import com.proofcart.domain.repo.CheckoutOrderRepository;
+import com.proofcart.domain.repo.MarketOrderRepository;
 import com.proofcart.inventory.InventoryReservationService;
 import com.razorpay.Utils;
 import org.json.JSONObject;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -20,13 +22,15 @@ import java.util.Map;
 public class PaymentController {
 
     private final CheckoutOrderRepository orderRepo;
+    private final MarketOrderRepository marketOrderRepo;
     private final String keySecret;
     private final InventoryReservationService inventory;
     private final AuditEventService audit;
 
-    public PaymentController(CheckoutOrderRepository orderRepo, InventoryReservationService inventory,
+    public PaymentController(CheckoutOrderRepository orderRepo, MarketOrderRepository marketOrderRepo, InventoryReservationService inventory,
                              @Value("${razorpay.key.secret:}") String keySecret, AuditEventService audit) {
         this.orderRepo = orderRepo;
+        this.marketOrderRepo = marketOrderRepo;
         this.inventory = inventory;
         this.keySecret = keySecret;
         this.audit = audit;
@@ -39,8 +43,10 @@ public class PaymentController {
             String razorpayPaymentId = request.get("razorpay_payment_id");
             String razorpaySignature = request.get("razorpay_signature");
 
-            CheckoutOrderEntity order = orderRepo.findByRazorpayOrderId(razorpayOrderId);
-            if (order == null) {
+            // One Razorpay order collects one merchant's sub-order in the common case, or
+            // several sub-orders at once for a multi-merchant market order sharing one payment.
+            List<CheckoutOrderEntity> orders = orderRepo.findByRazorpayOrderId(razorpayOrderId);
+            if (orders.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Order not found"));
             }
 
@@ -57,17 +63,29 @@ public class PaymentController {
             boolean isValid = Utils.verifyPaymentSignature(options, keySecret);
 
             if (isValid) {
-                inventory.capture(order.getId());
-                order.setRazorpayPaymentId(razorpayPaymentId);
-                order.setStatus("PAID");
-                orderRepo.save(order);
-                audit.record(order.getBuyerId(), order.getMerchantId(), order.getCartId(), order.getId(), "PAYMENT_VERIFIED", "Razorpay payment signature verified.");
+                for (CheckoutOrderEntity order : orders) {
+                    inventory.capture(order.getId());
+                    order.setRazorpayPaymentId(razorpayPaymentId);
+                    order.setStatus("PAID");
+                    orderRepo.save(order);
+                    audit.record(order.getBuyerId(), order.getMerchantId(), order.getCartId(), order.getId(), "PAYMENT_VERIFIED", "Razorpay payment signature verified.");
+                }
+                marketOrderRepo.findByRazorpayOrderId(razorpayOrderId).ifPresent(mo -> {
+                    mo.setStatus("PAID");
+                    marketOrderRepo.save(mo);
+                });
                 return ResponseEntity.ok(Map.of("success", true));
             } else {
-                inventory.release(order.getId(), InventoryReservationService.RELEASED);
-                order.setStatus("FAILED_VERIFICATION");
-                orderRepo.save(order);
-                audit.record(order.getBuyerId(), order.getMerchantId(), order.getCartId(), order.getId(), "PAYMENT_REJECTED", "Razorpay payment signature rejected.");
+                for (CheckoutOrderEntity order : orders) {
+                    inventory.release(order.getId(), InventoryReservationService.RELEASED);
+                    order.setStatus("FAILED_VERIFICATION");
+                    orderRepo.save(order);
+                    audit.record(order.getBuyerId(), order.getMerchantId(), order.getCartId(), order.getId(), "PAYMENT_REJECTED", "Razorpay payment signature rejected.");
+                }
+                marketOrderRepo.findByRazorpayOrderId(razorpayOrderId).ifPresent(mo -> {
+                    mo.setStatus("FAILED_VERIFICATION");
+                    marketOrderRepo.save(mo);
+                });
                 return ResponseEntity.badRequest().body(Map.of("error", "Invalid payment signature. Payment rejected."));
             }
         } catch (Exception e) {

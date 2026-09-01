@@ -28,6 +28,15 @@ public class AuditEventEntity {
     @Column(name = "created_at")
     private final Instant createdAt = Instant.now();
 
+    // ─── Tamper-evident chain: each cart's events are linked and HMAC-signed so the trail
+    // can be independently re-verified later, not just displayed as an unverifiable log. ───
+    @Column(name = "chain_sequence")
+    private Integer chainSequence;
+    @Column(name = "prev_hash")
+    private String prevHash;
+    @Column(name = "hash")
+    private String hash;
+
     public UUID getId() {
         return id;
     }
@@ -90,5 +99,29 @@ public class AuditEventEntity {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Integer getChainSequence() {
+        return chainSequence;
+    }
+
+    public void setChainSequence(Integer v) {
+        chainSequence = v;
+    }
+
+    public String getPrevHash() {
+        return prevHash;
+    }
+
+    public void setPrevHash(String v) {
+        prevHash = v;
+    }
+
+    public String getHash() {
+        return hash;
+    }
+
+    public void setHash(String v) {
+        hash = v;
     }
 }

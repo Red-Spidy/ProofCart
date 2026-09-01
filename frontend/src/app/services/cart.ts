@@ -46,6 +46,10 @@ export class CartService {
     return this.http.get(`${this.apiUrl}/audit-receipts/${orderId}`);
   }
 
+  verifyAuditChain(orderId: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/audit-receipts/${orderId}/verify`);
+  }
+
   getCatalog(merchantId: string, searchQuery?: string): Observable<any> {
     const url = searchQuery
       ? `${this.apiUrl}/catalog/${merchantId}?q=${encodeURIComponent(searchQuery)}`

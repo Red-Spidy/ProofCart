@@ -48,6 +48,10 @@ mcp:
   token:
     pepper: ${MCP_TOKEN_PEPPER:default-pepper}
 
+audit:
+  chain:
+    secret: ${AUDIT_CHAIN_SECRET:proofcart-dev-chain-secret}
+
 razorpay:
   key:
     id: ${RAZORPAY_KEY_ID:}

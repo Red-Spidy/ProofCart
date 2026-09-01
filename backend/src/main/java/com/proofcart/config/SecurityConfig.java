@@ -2,6 +2,7 @@ package com.proofcart.config;
 
 import com.proofcart.mcp.auth.McpTokenAuthenticationFilter;
 import com.proofcart.security.SupabaseJwtAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -12,12 +13,20 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import java.util.Arrays;
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     private final SupabaseJwtAuthenticationFilter supabaseJwtFilter;
     private final McpTokenAuthenticationFilter mcpTokenAuthenticationFilter;
+
+    // Same property WebConfig's addCorsMappings reads — kept in sync so both configs agree,
+    // even though Spring Security's own CORS bean (below) is the one that actually governs
+    // /api/** since every request passes through the security filter chain.
+    @Value("${cors.allowed-origins:http://localhost:4200}")
+    private String allowedOriginsRaw;
 
     public SecurityConfig(SupabaseJwtAuthenticationFilter supabaseJwtFilter,
                           McpTokenAuthenticationFilter mcpTokenAuthenticationFilter) {
@@ -33,6 +42,8 @@ public class SecurityConfig {
                 .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Public: health check (Railway polls this with no auth)
+                        .requestMatchers("/actuator/health").permitAll()
                         // Public: H2 console (dev only)
                         .requestMatchers("/h2-console/**").permitAll()
                         // Public: Catalog lookup (no login required to browse products)
@@ -58,7 +69,10 @@ public class SecurityConfig {
     @Bean
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
         org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
-        configuration.setAllowedOrigins(java.util.List.of("http://localhost:4200"));
+        configuration.setAllowedOrigins(Arrays.stream(allowedOriginsRaw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .toList());
         configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(java.util.List.of("*"));
         configuration.setAllowCredentials(true);

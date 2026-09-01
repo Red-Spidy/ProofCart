@@ -1,5 +1,6 @@
 server:
-  port: 8080
+  # Railway (and most PaaS hosts) inject a dynamic PORT env var and expect the app to bind to it.
+  port: ${PORT:8080}
 
 spring:
   application:
@@ -31,14 +32,15 @@ spring:
       password: ${REDIS_PASSWORD:}
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:1s}
       timeout: ${REDIS_TIMEOUT:1s}
+      ssl:
+        # Upstash (and most managed Redis) requires TLS — set REDIS_SSL=true when using it.
+        enabled: ${REDIS_SSL:false}
       # If Redis is not reachable or empty, CatalogCacheService falls through to Postgres seamlessly
 
-  # ─── CORS for Angular dev server ───────────────────────────────────────────
-  web:
-    cors:
-      allowed-origins: "http://localhost:4200"
-      allowed-methods: "*"
-      allowed-headers: "*"
+# Comma-separated list — read by both WebConfig.addCorsMappings and
+# SecurityConfig.corsConfigurationSource (the one that actually governs /api/**).
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
 
 groq:
   api:

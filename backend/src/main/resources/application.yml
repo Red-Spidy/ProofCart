@@ -2,6 +2,16 @@ server:
   # Railway (and most PaaS hosts) inject a dynamic PORT env var and expect the app to bind to it.
   port: ${PORT:8080}
 
+# Actuator auto-configures a Redis health indicator the moment spring-data-redis is on the
+# classpath. CatalogCacheService already treats a down Redis as non-fatal (falls back to
+# Postgres) — without this, /actuator/health reports DOWN whenever Redis isn't configured,
+# which is exactly the case until Upstash is wired up, and it stalls the platform healthcheck
+# forever even though the app itself is running fine.
+management:
+  health:
+    redis:
+      enabled: false
+
 spring:
   application:
     name: proofcart-backend

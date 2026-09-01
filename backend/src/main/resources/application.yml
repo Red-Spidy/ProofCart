@@ -29,7 +29,11 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      # 'update' is convenient for local dev (auto-creates/alters tables), but it's slower —
+      # Hibernate has to diff every entity against the live schema on every boot. Set
+      # JPA_DDL_AUTO=validate in production once the schema is known-correct (it already is,
+      # via the supabase/migrations/*.sql files) — validate only checks, it doesn't diff+alter.
+      ddl-auto: ${JPA_DDL_AUTO:update}
     show-sql: false
     open-in-view: false
 

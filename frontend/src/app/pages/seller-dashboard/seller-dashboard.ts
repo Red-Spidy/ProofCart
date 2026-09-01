@@ -2,53 +2,106 @@ import {Component, OnInit} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
 import {MarketplaceService, SellerProduct} from '../../services/marketplace';
+import {IconComponent} from '../../components/icon/icon';
 
 type ProductForm = Omit<SellerProduct, 'id' | 'reservedQuantity' | 'availableQuantity'>;
 
 @Component({
   selector: 'app-seller-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, IconComponent],
   template: `
     <main class="page">
-      <header class="page-header"><p class="eyebrow">SELLER CONSOLE</p><h1>Manage your inventory</h1><p class="text-secondary">Stock is reserved at checkout, then reduced only once payment is verified.</p></header>
+      <header class="page-header">
+        <p class="eyebrow">Seller Console</p>
+        <h1>Manage your inventory</h1>
+        <p class="text-secondary">Stock is reserved at checkout, then reduced only once payment is verified.</p>
+      </header>
 
-      <section *ngIf="loading" class="glass-card state">Loading your store…</section>
-      <section *ngIf="error" class="error-card">⚠️ {{ error }}</section>
+      <section *ngIf="loading" class="card state">Loading your store…</section>
+      <section *ngIf="error" class="form-note danger"><app-icon name="alert-triangle" [size]="16"></app-icon><span>{{ error }}</span></section>
 
-      <section *ngIf="!loading && onboarding" class="glass-card form-card">
-        <h2>Create your store</h2><p class="text-secondary">This is the store buyers will see when they purchase your products.</p>
+      <section *ngIf="!loading && onboarding" class="card form-card">
+        <h2>Create your store</h2>
+        <p class="text-secondary">This is the store buyers will see when they purchase your products.</p>
         <form (ngSubmit)="saveStore()" class="form-grid">
-          <label>Store name<input class="input-glass" [(ngModel)]="storeName" name="storeName" required /></label>
-          <label class="full">Description<textarea class="input-glass" [(ngModel)]="storeDescription" name="storeDescription" rows="3"></textarea></label>
+          <label>Store name<input class="input" [(ngModel)]="storeName" name="storeName" required/></label>
+          <label class="full">Description<textarea class="input" [(ngModel)]="storeDescription" name="storeDescription" rows="3"></textarea></label>
           <button class="btn btn-primary" [disabled]="saving">{{ saving ? 'Creating…' : 'Create store' }}</button>
         </form>
       </section>
 
       <ng-container *ngIf="!loading && !onboarding">
-        <section class="glass-card store-card"><div><p class="eyebrow">YOUR STORE</p><h2>{{ merchant?.name }}</h2><p class="text-secondary">{{ merchant?.description || 'No store description yet.' }}</p></div><div class="stock-summary"><strong>{{ availableUnits }}</strong><span>units available</span></div></section>
+        <section class="card store-card">
+          <div>
+            <p class="eyebrow">Your Store</p>
+            <h2>{{ merchant?.name }}</h2>
+            <p class="text-secondary">{{ merchant?.description || 'No store description yet.' }}</p>
+          </div>
+          <div class="stock-summary">
+            <strong>{{ availableUnits }}</strong>
+            <span>units available</span>
+          </div>
+        </section>
+
         <section class="layout">
-          <form (ngSubmit)="saveProduct()" class="glass-card form-card">
+          <form (ngSubmit)="saveProduct()" class="card form-card">
             <h2>{{ editingId ? 'Edit product' : 'Add a product' }}</h2>
             <div class="form-grid">
-              <label class="full">Name<input class="input-glass" [(ngModel)]="product.name" name="name" required /></label>
-              <label>Price (₹)<input class="input-glass" type="number" min="0.01" step="0.01" [(ngModel)]="priceRupees" name="price" required /></label>
-              <label>Stock<input class="input-glass" type="number" min="0" step="1" [(ngModel)]="product.stockQuantity" name="stock" required /></label>
-              <label class="full">Description<textarea class="input-glass" [(ngModel)]="product.description" name="description" rows="3"></textarea></label>
-              <label>Delivery days<input class="input-glass" type="number" min="0" [(ngModel)]="product.deliveryDays" name="deliveryDays" /></label>
-              <label>Dietary tags<input class="input-glass" [(ngModel)]="tagsText" name="tags" placeholder="vegan, organic" /></label>
-              <label>Allergens<input class="input-glass" [(ngModel)]="allergensText" name="allergens" placeholder="nuts, dairy" /></label>
-              <label class="toggle"><input type="checkbox" [(ngModel)]="product.returnable" name="returnable" /> Returnable</label>
-              <label class="toggle"><input type="checkbox" [(ngModel)]="product.subscriptionAvailable" name="subscription" /> Subscription available</label>
-              <div class="actions full"><button class="btn btn-primary" [disabled]="saving">{{ saving ? 'Saving…' : (editingId ? 'Save changes' : 'Add product') }}</button><button *ngIf="editingId" type="button" class="btn btn-secondary" (click)="resetProduct()">Cancel</button></div>
+              <label class="full">Name<input class="input" [(ngModel)]="product.name" name="name" required/></label>
+              <label>Price (₹)<input class="input" type="number" min="0.01" step="0.01" [(ngModel)]="priceRupees" name="price" required/></label>
+              <label>Stock<input class="input" type="number" min="0" step="1" [(ngModel)]="product.stockQuantity" name="stock" required/></label>
+              <label class="full">Description<textarea class="input" [(ngModel)]="product.description" name="description" rows="3"></textarea></label>
+              <label>Delivery days<input class="input" type="number" min="0" [(ngModel)]="product.deliveryDays" name="deliveryDays"/></label>
+              <label>Dietary tags<input class="input" [(ngModel)]="tagsText" name="tags" placeholder="vegan, organic"/></label>
+              <label>Allergens<input class="input" [(ngModel)]="allergensText" name="allergens" placeholder="nuts, dairy"/></label>
+              <label class="toggle"><input type="checkbox" [(ngModel)]="product.returnable" name="returnable"/> Returnable</label>
+              <label class="toggle"><input type="checkbox" [(ngModel)]="product.subscriptionAvailable" name="subscription"/> Subscription available</label>
+              <div class="actions full">
+                <button class="btn btn-primary" [disabled]="saving">{{ saving ? 'Saving…' : (editingId ? 'Save changes' : 'Add product') }}</button>
+                <button *ngIf="editingId" type="button" class="btn btn-secondary" (click)="resetProduct()">Cancel</button>
+              </div>
             </div>
           </form>
-          <section class="products"><h2>Products <span>{{ products.length }}</span></h2><div *ngIf="products.length === 0" class="glass-card state">Add your first product to start selling.</div><article *ngFor="let p of products" class="glass-card product"><div><h3>{{ p.name }}</h3><p class="text-secondary">₹{{ p.pricePaise / 100 }} · {{ p.availableQuantity }} available <span *ngIf="p.reservedQuantity">· {{ p.reservedQuantity }} reserved</span></p></div><button class="btn btn-secondary btn-sm" (click)="edit(p)">Edit</button></article></section>
+
+          <section class="products">
+            <h2>Products <span>{{ products.length }}</span></h2>
+            <div *ngIf="products.length === 0" class="card state">Add your first product to start selling.</div>
+            <article *ngFor="let p of products" class="card product">
+              <div>
+                <h3>{{ p.name }}</h3>
+                <p class="text-secondary">₹{{ p.pricePaise / 100 }} · {{ p.availableQuantity }} available
+                  <span *ngIf="p.reservedQuantity">· {{ p.reservedQuantity }} reserved</span>
+                </p>
+              </div>
+              <button class="btn btn-secondary btn-sm" (click)="edit(p)">Edit</button>
+            </article>
+          </section>
         </section>
       </ng-container>
     </main>`,
   styles: [`
-    .page { max-width: 1180px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }.page-header { margin-bottom: 2rem; }.page-header h1 { font-size: 2.25rem; margin:.25rem 0 .5rem; }.eyebrow { color:var(--accent-blue-light); font-size:.72rem; font-weight:800; letter-spacing:.12em; }.layout { display:grid; grid-template-columns:minmax(320px,.9fr) 1.1fr; gap:1.25rem; margin-top:1.25rem; }.form-card,.store-card { padding:1.5rem; }.form-card h2,.products h2 { margin-bottom:1rem; }.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1rem; }.form-grid label { display:flex; flex-direction:column; gap:.4rem; font-size:.8rem; color:var(--text-secondary); }.full { grid-column:1/-1; }.toggle { flex-direction:row !important; align-items:center; }.actions { display:flex; gap:.75rem; }.store-card { display:flex; align-items:center; justify-content:space-between; }.stock-summary { text-align:right; display:flex; flex-direction:column; }.stock-summary strong { color:var(--accent-emerald); font-size:2rem; }.stock-summary span { font-size:.75rem; color:var(--text-muted); }.products { display:flex; flex-direction:column; gap:.75rem; }.products h2 span { font-size:.8rem; color:var(--text-muted); }.product { padding:1rem 1.25rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; }.product h3 { margin:0 0 .3rem; }.state { padding:2rem; text-align:center; }.error-card { margin-bottom:1rem; padding:1rem; color:var(--accent-rose); background:rgba(244,63,94,.08); border:1px solid rgba(244,63,94,.3); border-radius:var(--radius-md); }.btn-sm { padding:.4rem .75rem; font-size:.8rem; } @media(max-width:800px) { .layout { grid-template-columns:1fr; }.form-grid { grid-template-columns:1fr; }.full { grid-column:auto; } }
+    .page { max-width: 1160px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+    .page-header { margin-bottom: 2rem; }
+    .page-header h1 { font-size: 1.75rem; margin: 0.25rem 0 0.5rem; }
+    .layout { display: grid; grid-template-columns: minmax(320px, 0.9fr) 1.1fr; gap: 1.25rem; margin-top: 1.25rem; }
+    .form-card, .store-card { padding: 1.5rem; }
+    .form-card h2, .products h2 { margin-bottom: 1rem; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+    .form-grid label { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.8125rem; color: var(--text-secondary); font-weight: 500; }
+    .full { grid-column: 1 / -1; }
+    .toggle { flex-direction: row !important; align-items: center; }
+    .actions { display: flex; gap: 0.75rem; }
+    .store-card { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+    .stock-summary { text-align: right; display: flex; flex-direction: column; }
+    .stock-summary strong { color: var(--success); font-size: 1.75rem; font-weight: 700; }
+    .stock-summary span { font-size: 0.75rem; color: var(--text-muted); }
+    .products { display: flex; flex-direction: column; gap: 0.75rem; }
+    .products h2 span { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
+    .product { padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .product h3 { margin: 0 0 0.3rem; font-size: 0.9375rem; }
+    .state { padding: 2rem; text-align: center; color: var(--text-muted); }
+    @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } .form-grid { grid-template-columns: 1fr; } .full { grid-column: auto; } }
   `]
 })
 export class SellerDashboardComponent implements OnInit {

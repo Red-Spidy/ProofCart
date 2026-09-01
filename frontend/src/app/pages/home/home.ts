@@ -5,35 +5,37 @@ import {Router} from '@angular/router';
 import {IntentExtraction, IntentService} from '../../services/intent';
 import {CartService} from '../../services/cart';
 import {ProductCardComponent} from '../../components/product-card/product-card';
+import {IconComponent} from '../../components/icon/icon';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, FormsModule, ProductCardComponent],
+  imports: [CommonModule, FormsModule, ProductCardComponent, IconComponent],
   template: `
     <div class="page">
       <!-- Hero -->
       <section class="hero animate-fade-in">
-        <div class="hero-badge">🤖 AI-Powered Safe Shopping</div>
-        <h1 class="hero-title">
-          Tell us what you need.<br/>
-          <span class="text-gradient">AI picks it for you.</span>
-        </h1>
+        <div class="hero-badge">
+          <app-icon name="sparkles" [size]="13"></app-icon> AI-powered, policy-gated shopping
+        </div>
+        <h1 class="hero-title">Tell us what you need.<br/>The policy engine decides what's safe to buy.</h1>
         <p class="hero-subtitle">
-          Describe your budget, allergies, and dietary needs. Our AI will automatically select
-          the best matching products and enforce every rule before checkout.
+          Describe your budget, allergies, and dietary needs. The agent selects matching products —
+          every rule is checked before a payment can ever be created.
         </p>
 
         <div class="intent-box">
           <textarea
-            class="input-glass"
+            class="input"
             [(ngModel)]="prompt"
-            placeholder="e.g. I want vegan snacks under ₹900, no peanuts, deliver today..."
+            placeholder="e.g. I want vegan snacks under ₹900, no peanuts, deliver today…"
             rows="3"
             [disabled]="loading">
           </textarea>
           <button class="btn btn-primary intent-btn" (click)="goShopping()" [disabled]="loading || !prompt.trim()">
-            <span *ngIf="!loading">🛒 Build My Cart</span>
+            <ng-container *ngIf="!loading">
+              <app-icon name="cart" [size]="16"></app-icon> Build My Cart
+            </ng-container>
             <span *ngIf="loading">{{ loadingStep }}</span>
           </button>
         </div>
@@ -43,25 +45,25 @@ import {ProductCardComponent} from '../../components/product-card/product-card';
       <section class="loading-section animate-fade-in" *ngIf="loading">
         <div class="step-list">
           <div class="step" [class.done]="stepsDone >= 1" [class.active]="stepsDone === 0">
-            <span class="step-icon">{{ stepsDone >= 1 ? '✓' : '⏳' }}</span>
-            <span>Parsing your intent with AI...</span>
+            <app-icon [name]="stepsDone >= 1 ? 'check' : 'loader'" [size]="15" [class.spin]="stepsDone < 1"></app-icon>
+            <span>Parsing your intent with AI</span>
           </div>
           <div class="step" [class.done]="stepsDone >= 2" [class.active]="stepsDone === 1">
-            <span class="step-icon">{{ stepsDone >= 2 ? '✓' : (stepsDone === 1 ? '⏳' : '○') }}</span>
-            <span>Selecting matching products...</span>
+            <app-icon [name]="stepsDone >= 2 ? 'check' : 'loader'" [size]="15" [class.spin]="stepsDone === 1"></app-icon>
+            <span>Selecting matching products</span>
           </div>
           <div class="step" [class.done]="stepsDone >= 3" [class.active]="stepsDone === 2">
-            <span class="step-icon">{{ stepsDone >= 3 ? '✓' : (stepsDone === 2 ? '⏳' : '○') }}</span>
-            <span>Running policy engine checks...</span>
+            <app-icon [name]="stepsDone >= 3 ? 'check' : 'loader'" [size]="15" [class.spin]="stepsDone === 2"></app-icon>
+            <span>Running policy engine checks</span>
           </div>
         </div>
       </section>
 
       <!-- Error State -->
       <section class="error-section animate-fade-in" *ngIf="errorMessage">
-        <div class="error-card glass-panel">
-          <span>⚠️</span>
-          <div>
+        <div class="form-note danger error-card">
+          <app-icon name="alert-triangle" [size]="18"></app-icon>
+          <div class="error-body">
             <strong>Something went wrong</strong>
             <p>{{ errorMessage }}</p>
           </div>
@@ -69,32 +71,32 @@ import {ProductCardComponent} from '../../components/product-card/product-card';
         </div>
       </section>
 
-      <!-- How It Works (Hidden while loading) -->
-      <section class="how-it-works animate-fade-in animate-fade-in-delay-2" *ngIf="!loading && !intent">
-        <h2>How It Works</h2>
+      <!-- How It Works -->
+      <section class="how-it-works animate-fade-in" *ngIf="!loading && !intent">
+        <h2>How it works</h2>
         <div class="steps-grid">
-          <div class="hiw-card glass-card">
-            <div class="hiw-icon">💬</div>
+          <div class="hiw-card card">
+            <div class="hiw-icon"><app-icon name="user" [size]="18"></app-icon></div>
             <h3>1. Describe</h3>
-            <p>Tell the AI your budget, dietary needs, and allergen restrictions in plain language.</p>
+            <p>Tell the agent your budget, dietary needs, and allergen restrictions in plain language.</p>
           </div>
-          <div class="hiw-card glass-card">
-            <div class="hiw-icon">🤖</div>
-            <h3>2. AI Selects</h3>
-            <p>Our engine automatically picks the best products that match ALL your constraints.</p>
+          <div class="hiw-card card">
+            <div class="hiw-icon"><app-icon name="sparkles" [size]="18"></app-icon></div>
+            <h3>2. Agent selects</h3>
+            <p>The engine automatically picks products that match every constraint you set.</p>
           </div>
-          <div class="hiw-card glass-card">
-            <div class="hiw-icon">🛡️</div>
-            <h3>3. Review & Pay</h3>
-            <p>See every policy check (allergens, budget, diet) before approving checkout.</p>
+          <div class="hiw-card card">
+            <div class="hiw-icon"><app-icon name="shield-check" [size]="18"></app-icon></div>
+            <h3>3. Review & pay</h3>
+            <p>See every policy check — allergens, budget, delivery — before approving checkout.</p>
           </div>
         </div>
       </section>
 
-      <!-- Catalog (Always visible below) -->
-      <section class="catalog-section animate-fade-in animate-fade-in-delay-3" *ngIf="!loading">
+      <!-- Catalog -->
+      <section class="catalog-section animate-fade-in" *ngIf="!loading">
         <div class="recommendations" *ngIf="recommendations.length && !catalogSearch">
-          <h2>✨ Picked for you</h2>
+          <h2>Picked for you</h2>
           <p class="text-secondary text-sm">Learns from your searches and feedback. Only you influence these suggestions.</p>
           <div class="product-grid">
             <div *ngFor="let p of recommendations" class="recommendation-card">
@@ -103,31 +105,34 @@ import {ProductCardComponent} from '../../components/product-card/product-card';
             </div>
           </div>
         </div>
+
         <div class="catalog-header">
-          <h2>🛍️ NutriBasket Catalog</h2>
+          <h2>Catalog</h2>
           <div class="catalog-search">
             <input
               type="text"
-              class="input-glass catalog-search-input"
-              placeholder="Search products (e.g. oats, almond milk)..."
+              class="input catalog-search-input"
+              placeholder="Search products (e.g. oats, almond milk)…"
               [(ngModel)]="catalogSearch"
               (keyup.enter)="searchCatalog()"
             />
             <button class="btn btn-secondary btn-sm" (click)="searchCatalog()" [disabled]="catalogSearching">
-              {{ catalogSearching ? '⏳' : '🔍 Search' }}
+              <app-icon name="search" [size]="14"></app-icon> Search
             </button>
-            <button *ngIf="catalogSearch" class="btn btn-sm" style="opacity:0.6" (click)="clearSearch()">✕ Clear</button>
+            <button *ngIf="catalogSearch" class="btn btn-ghost btn-sm" (click)="clearSearch()">
+              <app-icon name="x" [size]="14"></app-icon> Clear
+            </button>
           </div>
         </div>
-        <p *ngIf="catalogSearch && !catalogSearching" class="text-secondary text-sm" style="margin-bottom:1.5rem">
+        <p *ngIf="catalogSearch && !catalogSearching" class="text-secondary text-sm search-note">
           Showing results for "{{ catalogSearch }}" from Open Food Facts
         </p>
         <div class="product-grid">
           <app-product-card
             *ngFor="let p of catalog; let i = index"
             [product]="p"
-            [class]="'animate-fade-in'"
-            [style.animation-delay.ms]="i * 80"
+            class="animate-fade-in"
+            [style.animation-delay.ms]="i * 60"
             (feedback)="recordFeedback($event)">
           </app-product-card>
         </div>
@@ -137,71 +142,49 @@ import {ProductCardComponent} from '../../components/product-card/product-card';
   styles: [`
     .page { padding-bottom: 4rem; }
     .recommendations { margin: 1.5rem 0 3rem; }
-    .recommendations h2 { margin-bottom: .35rem; }
+    .recommendations h2 { margin-bottom: 0.35rem; }
     .recommendation-card { position: relative; }
-    .recommendation-reason { display: block; color: var(--accent-blue-light); font-size: .75rem; margin: .75rem 0 .35rem; }
+    .recommendation-reason { display: block; color: var(--accent); font-size: 0.75rem; font-weight: 500; margin: 0.75rem 0 0.5rem; }
 
     /* ── Hero ──── */
-    .hero {
-      text-align: center;
-      padding: 3rem 0 2rem;
-    }
+    .hero { text-align: center; padding: 2.5rem 0 2rem; }
 
     .hero-badge {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
-      padding: 0.375rem 1rem;
+      gap: 0.4375rem;
+      padding: 0.375rem 0.875rem;
       border-radius: var(--radius-full);
-      background: rgba(59, 130, 246, 0.08);
-      border: 1px solid rgba(59, 130, 246, 0.15);
+      background: var(--accent-tint);
+      border: 1px solid var(--accent-border);
       font-size: 0.8125rem;
       font-weight: 600;
-      color: var(--accent-blue-light);
+      color: var(--accent);
       margin-bottom: 1.5rem;
     }
 
     .hero-title {
-      font-size: 2.75rem;
-      font-weight: 800;
-      letter-spacing: -0.04em;
-      line-height: 1.15;
+      font-size: 2.25rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
       margin-bottom: 1rem;
     }
 
     .hero-subtitle {
       color: var(--text-secondary);
       font-size: 1.0625rem;
-      max-width: 540px;
-      margin: 0 auto 2.5rem;
+      max-width: 560px;
+      margin: 0 auto 2.25rem;
       line-height: 1.6;
     }
 
-    .intent-box {
-      max-width: 600px;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .intent-btn {
-      align-self: flex-end;
-      padding: 0.75rem 2rem;
-      font-size: 1rem;
-    }
+    .intent-box { max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 0.75rem; }
+    .intent-btn { align-self: flex-end; padding: 0.75rem 1.75rem; font-size: 0.9375rem; }
 
     /* ── Loading ── */
-    .loading-section {
-      max-width: 480px;
-      margin: 2rem auto 0;
-    }
-
-    .step-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
+    .loading-section { max-width: 460px; margin: 2rem auto 0; }
+    .step-list { display: flex; flex-direction: column; gap: 0.625rem; }
 
     .step {
       display: flex;
@@ -209,174 +192,69 @@ import {ProductCardComponent} from '../../components/product-card/product-card';
       gap: 0.75rem;
       padding: 0.75rem 1rem;
       border-radius: var(--radius-md);
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid var(--border-subtle);
+      background: var(--surface);
+      border: 1px solid var(--border);
       color: var(--text-muted);
       font-size: 0.9375rem;
-      transition: all 0.3s ease;
     }
 
-    .step.active {
-      border-color: var(--accent-blue);
-      background: rgba(59, 130, 246, 0.06);
-      color: var(--text-primary);
-    }
-
-    .step.done {
-      border-color: rgba(16, 185, 129, 0.3);
-      color: var(--accent-emerald);
-    }
-
-    .step-icon {
-      font-size: 1rem;
-      width: 24px;
-      text-align: center;
-    }
+    .step.active { border-color: var(--accent-border); background: var(--accent-tint); color: var(--text-primary); }
+    .step.done { border-color: var(--success-border); background: var(--success-tint); color: var(--success); }
 
     /* ── Error ──── */
-    .error-section {
-      max-width: 600px;
-      margin: 2rem auto 0;
-    }
-
-    .error-card {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      padding: 1rem 1.25rem;
-      border-color: rgba(244, 63, 94, 0.3);
-      background: rgba(244, 63, 94, 0.06);
-    }
-
-    .error-card p {
-      color: var(--text-secondary);
-      font-size: 0.875rem;
-      margin: 0;
-    }
-
-    /* ── Rules Preview ── */
-    .rules-preview {
-      max-width: 600px;
-      margin: 2rem auto 0;
-    }
-
-    .rules-card {
-      padding: 1.25rem;
-    }
-
-    .rules-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1rem;
-    }
-
-    .rules-header h3 { font-size: 1rem; }
-
-    .rules-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    .rule-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-      padding: 0.375rem 0.875rem;
-      border-radius: var(--radius-full);
-      background: rgba(59, 130, 246, 0.08);
-      border: 1px solid rgba(59, 130, 246, 0.15);
-      font-size: 0.8125rem;
-      font-weight: 600;
-      color: var(--accent-blue-light);
-    }
-
-    .rule-chip.danger {
-      background: rgba(244, 63, 94, 0.08);
-      border-color: rgba(244, 63, 94, 0.2);
-      color: var(--accent-rose);
-    }
+    .error-section { max-width: 600px; margin: 2rem auto 0; }
+    .error-card { align-items: center; }
+    .error-body { flex: 1; }
+    .error-body p { margin-top: 0.125rem; }
 
     /* ── Catalog ── */
-    .catalog-section {
-      margin-top: 4rem;
-      max-width: 1000px;
-      margin-left: auto;
-      margin-right: auto;
-    }
+    .catalog-section { margin-top: 3.5rem; max-width: 1000px; margin-left: auto; margin-right: auto; }
 
     .catalog-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 2rem;
+      margin-bottom: 0.75rem;
       gap: 1rem;
       flex-wrap: wrap;
     }
 
-    .catalog-header h2 {
-      font-size: 1.75rem;
-    }
+    .catalog-header h2 { font-size: 1.5rem; }
+    .search-note { margin-bottom: 1.25rem; }
 
-    .catalog-search {
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-    }
-
-    .catalog-search-input {
-      padding: 0.5rem 0.875rem;
-      font-size: 0.875rem;
-      min-width: 260px;
-    }
+    .catalog-search { display: flex; gap: 0.5rem; align-items: center; }
+    .catalog-search-input { padding: 0.5rem 0.875rem; font-size: 0.875rem; min-width: 260px; }
 
     .product-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 1.5rem;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1.5rem;
     }
 
     /* ── How It Works ── */
-    .how-it-works {
-      margin-top: 4rem;
-    }
-
-    .how-it-works h2 {
-      text-align: center;
-      margin-bottom: 2rem;
-      font-size: 1.5rem;
-    }
-
-    .steps-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1.25rem;
-    }
-
-    .hiw-card {
-      padding: 1.5rem;
-      text-align: center;
-    }
+    .how-it-works { margin-top: 3.5rem; }
+    .how-it-works h2 { text-align: center; margin-bottom: 1.75rem; font-size: 1.375rem; }
+    .steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+    .hiw-card { padding: 1.5rem; text-align: center; }
 
     .hiw-icon {
-      font-size: 2.5rem;
-      margin-bottom: 1rem;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-md);
+      background: var(--accent-tint);
+      color: var(--accent);
+      margin: 0 auto 1rem;
     }
 
-    .hiw-card h3 {
-      font-size: 1rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .hiw-card p {
-      font-size: 0.8125rem;
-      color: var(--text-muted);
-      line-height: 1.5;
-    }
+    .hiw-card h3 { font-size: 0.9375rem; margin-bottom: 0.5rem; }
+    .hiw-card p { font-size: 0.8125rem; color: var(--text-muted); line-height: 1.5; }
 
     @media (max-width: 640px) {
-      .hero-title { font-size: 2rem; }
+      .hero-title { font-size: 1.75rem; }
       .steps-grid { grid-template-columns: 1fr; }
     }
   `]
@@ -423,7 +301,6 @@ export class HomeComponent implements OnInit {
 
   searchCatalog() {
     if (!this.catalogSearch.trim()) {
-      // Reset to default catalog
       this.ngOnInit();
       return;
     }
@@ -465,14 +342,14 @@ export class HomeComponent implements OnInit {
     this.loading = true;
     this.errorMessage = '';
     this.stepsDone = 0;
-    this.loadingStep = '⏳ Step 1: Parsing intent...';
+    this.loadingStep = 'Step 1: Parsing intent…';
 
     // Step 1: Parse intent (saves to DB, returns intentId)
     this.intentService.parseIntent(this.prompt).subscribe({
       next: (intentResult) => {
         this.intent = intentResult;
         this.stepsDone = 1;
-        this.loadingStep = '⏳ Step 2: Selecting products...';
+        this.loadingStep = 'Step 2: Selecting products…';
 
         // Step 2: AI auto-selects products based on rules
         const selectedItems = this.autoSelectProducts(intentResult.rules);
@@ -484,7 +361,7 @@ export class HomeComponent implements OnInit {
         }
 
         this.stepsDone = 2;
-        this.loadingStep = '⏳ Step 3: Running policy checks...';
+        this.loadingStep = 'Step 3: Running policy checks…';
 
         // Step 3: Create proof cart with the real intentId
         this.cartService.createProofCart(this.MERCHANT_ID, intentResult.intentId, selectedItems).subscribe({

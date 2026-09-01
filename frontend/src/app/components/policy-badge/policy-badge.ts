@@ -1,82 +1,60 @@
 import {Component, Input} from '@angular/core';
 import {CommonModule} from '@angular/common';
+import {IconComponent} from '../icon/icon';
 
 @Component({
   selector: 'app-policy-badge',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, IconComponent],
   template: `
     <div class="check-row" [class.passed]="check.passed" [class.failed]="!check.passed">
-      <div class="check-status">
-        <span class="check-icon" *ngIf="check.passed">✓</span>
-        <span class="check-icon" *ngIf="!check.passed">✕</span>
+      <div class="check-icon">
+        <app-icon [name]="check.passed ? 'check' : 'x'" [size]="14" [strokeWidth]="2.5"></app-icon>
       </div>
       <div class="check-info">
         <span class="check-name">{{ formatRuleName(check.rule) }}</span>
         <span class="check-msg">{{ check.message || check.reason }}</span>
       </div>
-      <div class="check-badge">
-        <span class="badge" [ngClass]="check.passed ? 'badge-success' : 'badge-danger'">
-          {{ check.passed ? 'PASS' : 'FAIL' }}
-        </span>
-      </div>
+      <span class="badge" [ngClass]="check.passed ? 'badge-success' : 'badge-danger'">
+        {{ check.passed ? 'Pass' : 'Fail' }}
+      </span>
     </div>
   `,
   styles: [`
     .check-row {
       display: flex;
       align-items: center;
-      gap: 1rem;
-      padding: 0.875rem 1rem;
+      gap: 0.875rem;
+      padding: 0.75rem 0.875rem;
       border-radius: var(--radius-md);
-      border: 1px solid var(--border-subtle);
-      background: rgba(255, 255, 255, 0.02);
-      transition: all 0.2s ease;
-    }
-
-    .check-row:hover {
-      background: rgba(255, 255, 255, 0.04);
-    }
-
-    .check-row.passed {
-      border-left: 3px solid var(--accent-emerald);
+      border: 1px solid var(--border);
+      background: var(--surface);
     }
 
     .check-row.failed {
-      border-left: 3px solid var(--accent-rose);
-      background: rgba(244, 63, 94, 0.04);
-    }
-
-    .check-status {
-      flex-shrink: 0;
+      border-color: var(--danger-border);
+      background: var(--danger-tint);
     }
 
     .check-icon {
-      width: 28px;
-      height: 28px;
+      flex-shrink: 0;
+      width: 26px;
+      height: 26px;
       display: flex;
       align-items: center;
       justify-content: center;
       border-radius: 50%;
-      font-size: 0.8125rem;
-      font-weight: 700;
     }
 
-    .passed .check-icon {
-      background: rgba(16, 185, 129, 0.12);
-      color: var(--accent-emerald);
-    }
-
-    .failed .check-icon {
-      background: rgba(244, 63, 94, 0.12);
-      color: var(--accent-rose);
-    }
+    .passed .check-icon { background: var(--success-tint); color: var(--success); }
+    .failed .check-icon { background: var(--surface); color: var(--danger); }
 
     .check-info {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 0.125rem;
+      gap: 0.0625rem;
+      min-width: 0;
     }
 
     .check-name {
@@ -86,11 +64,7 @@ import {CommonModule} from '@angular/common';
 
     .check-msg {
       font-size: 0.8125rem;
-      color: var(--text-muted);
-    }
-
-    .check-badge {
-      flex-shrink: 0;
+      color: var(--text-secondary);
     }
   `]
 })

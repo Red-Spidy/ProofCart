@@ -14,6 +14,8 @@ import {NavbarComponent} from './components/navbar/navbar';
   `,
   styles: [`
     main {
+      display: block;
+      min-height: calc(100vh - 64px);
       padding-top: 2rem;
       padding-bottom: 4rem;
     }

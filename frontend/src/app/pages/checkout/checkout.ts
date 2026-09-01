@@ -3,6 +3,7 @@ import {CommonModule} from '@angular/common';
 import {ActivatedRoute, Router} from '@angular/router';
 import {CartService} from '../../services/cart';
 import {environment} from '../../../environments/environment';
+import {IconComponent} from '../../components/icon/icon';
 
 // Declare Razorpay global
 declare var Razorpay: any;
@@ -10,41 +11,62 @@ declare var Razorpay: any;
 @Component({
   selector: 'app-checkout',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, IconComponent],
   template: `
-    <div class="checkout-container glass-panel animate-fade-in">
-      <h1 class="text-gradient">Secure Checkout</h1>
-      <p class="text-muted">Your cart has been securely locked and verified by the Policy Engine.</p>
+    <div class="checkout-container panel animate-fade-in">
+      <div class="lock-badge"><app-icon name="lock" [size]="18"></app-icon></div>
+      <h1>Secure Checkout</h1>
+      <p class="text-muted">This cart has been re-verified against the live catalog and policy engine.</p>
 
       <div class="loader" *ngIf="loading">
-        <p>Re-verifying catalog state...</p>
+        <app-icon name="loader" [size]="18" class="spin"></app-icon>
+        <span>Re-verifying catalog state…</span>
       </div>
 
       <div *ngIf="orderId" class="order-ready">
         <div class="amount">₹{{ (amountPaise / 100).toFixed(2) }}</div>
         <button class="btn btn-primary pay-btn" (click)="openRazorpay()">Pay with Razorpay</button>
+        <p class="test-note">Razorpay test mode — no real payment will be collected.</p>
       </div>
     </div>
   `,
   styles: [`
     .checkout-container {
-      max-width: 600px;
+      max-width: 480px;
       margin: 4rem auto;
-      padding: 3rem;
+      padding: 2.5rem;
       text-align: center;
     }
+    .lock-badge {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: var(--accent-tint);
+      color: var(--accent);
+      margin: 0 auto 1.25rem;
+    }
+    h1 { font-size: 1.375rem; margin-bottom: 0.375rem; }
     .amount {
-      font-size: 3rem;
+      font-size: 2.5rem;
       font-weight: 700;
-      color: var(--text-main);
-      margin: 2rem 0;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+      margin: 1.75rem 0 1.25rem;
     }
-    .pay-btn {
-      width: 100%;
-      font-size: 1.25rem;
-      padding: 1rem;
+    .pay-btn { width: 100%; font-size: 1rem; padding: 0.875rem; }
+    .test-note { margin-top: 0.875rem; font-size: 0.75rem; color: var(--text-muted); }
+    .loader {
+      margin: 1.75rem 0 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
     }
-    .loader { margin: 2rem 0; color: var(--primary-glow); }
   `]
 })
 export class CheckoutComponent implements OnInit {
@@ -87,8 +109,8 @@ export class CheckoutComponent implements OnInit {
       key: environment.razorpayKeyId,
       amount: this.amountPaise,
       currency: 'INR',
-      name: 'NutriBasket',
-      description: 'Safe Shopping Purchase',
+      name: 'ProofCart',
+      description: 'Policy-verified purchase',
       order_id: this.razorpayOrderId,
       handler: (response: any) => {
         this.verifyPayment(response);
@@ -98,7 +120,7 @@ export class CheckoutComponent implements OnInit {
           console.log('Razorpay modal dismissed by user.');
         }
       },
-      theme: {color: '#0ea5e9'}
+      theme: {color: '#4338ca'}
     };
 
     if (typeof Razorpay !== 'undefined') {

@@ -1,6 +1,8 @@
 package com.proofcart.domain.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -23,6 +25,9 @@ public class AuditEventEntity {
     private String eventType;
     @Column(nullable = false)
     private String description;
+    // Postgres rejects an implicit varchar->json cast on insert unless Hibernate is told this
+    // column is JSON-typed (H2's looser typing let this slip through undetected in tests).
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "json")
     private String metadata = "{}";
     @Column(name = "created_at")

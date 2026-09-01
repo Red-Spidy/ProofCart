@@ -27,6 +27,11 @@ public class CheckoutOrderEntity {
     @Column(name = "razorpay_order_id", nullable = false)
     private String razorpayOrderId;
 
+    // Which agent token (if any) authorized this checkout — null when the buyer's own
+    // Supabase session created it directly rather than a delegated AI agent.
+    @Column(name = "agent_token_id")
+    private UUID agentTokenId;
+
     @Column(name = "razorpay_payment_id")
     private String razorpayPaymentId;
 
@@ -83,6 +88,14 @@ public class CheckoutOrderEntity {
 
     public void setRazorpayOrderId(String razorpayOrderId) {
         this.razorpayOrderId = razorpayOrderId;
+    }
+
+    public UUID getAgentTokenId() {
+        return agentTokenId;
+    }
+
+    public void setAgentTokenId(UUID agentTokenId) {
+        this.agentTokenId = agentTokenId;
     }
 
     public String getRazorpayPaymentId() {

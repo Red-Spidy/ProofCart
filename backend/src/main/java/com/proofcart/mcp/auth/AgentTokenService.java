@@ -20,16 +20,26 @@ public class AgentTokenService {
         this.pepper = pepper;
     }
 
-    public TokenCreated create(UUID buyerId, String name, Instant expiresAt) {
+    public TokenCreated create(UUID buyerId, String name, Instant expiresAt, Integer maxPerTransactionPaise,
+                                Integer maxDailyPaise, List<String> allowedMerchantIds) {
         if (name == null || name.isBlank()) throw new IllegalArgumentException("Token name is required.");
         if (expiresAt != null && !expiresAt.isAfter(Instant.now()))
             throw new IllegalArgumentException("Token expiry must be in the future.");
+        if (maxPerTransactionPaise != null && maxPerTransactionPaise < 1)
+            throw new IllegalArgumentException("maxPerTransactionPaise must be positive.");
+        if (maxDailyPaise != null && maxDailyPaise < 1)
+            throw new IllegalArgumentException("maxDailyPaise must be positive.");
+        if (maxPerTransactionPaise != null && maxDailyPaise != null && maxPerTransactionPaise > maxDailyPaise)
+            throw new IllegalArgumentException("The per-transaction limit cannot exceed the daily mandate.");
         String raw = "pc_" + UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
         AgentTokenEntity entity = new AgentTokenEntity();
         entity.setBuyerId(buyerId);
         entity.setName(name.trim().substring(0, Math.min(255, name.trim().length())));
         entity.setTokenHash(hash(raw));
         entity.setExpiresAt(expiresAt);
+        entity.setMaxPerTransactionPaise(maxPerTransactionPaise);
+        entity.setMaxDailyPaise(maxDailyPaise);
+        entity.setAllowedMerchantIds(allowedMerchantIds == null ? List.of() : allowedMerchantIds);
         AgentTokenEntity saved = tokens.save(entity);
         return new TokenCreated(saved, raw);
     }

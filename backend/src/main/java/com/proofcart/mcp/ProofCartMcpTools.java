@@ -8,11 +8,13 @@ import com.proofcart.domain.entity.CheckoutOrderEntity;
 import com.proofcart.domain.entity.IntentContractEntity;
 import com.proofcart.domain.entity.ProductEntity;
 import com.proofcart.domain.entity.ProofCartEntity;
+import com.proofcart.domain.repo.AgentTokenRepository;
 import com.proofcart.domain.repo.CheckoutOrderRepository;
 import com.proofcart.domain.repo.IntentContractRepository;
 import com.proofcart.domain.repo.ProductRepository;
 import com.proofcart.domain.repo.ProofCartRepository;
 import com.proofcart.intent.GroqIntentExtractor;
+import com.proofcart.mandate.AgentMandateService;
 import com.proofcart.upsell.UpsellService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -37,8 +39,10 @@ public class ProofCartMcpTools {
     private final CheckoutOrderRepository orders;
     private final ObjectMapper mapper;
     private final UpsellService upsell;
+    private final AgentTokenRepository agentTokens;
+    private final AgentMandateService mandateService;
 
-    public ProofCartMcpTools(ProductRepository products, CatalogService catalog, GroqIntentExtractor intents, IntentContractRepository contracts, ProofCartRepository carts, CheckoutOrderRepository orders, ObjectMapper mapper, UpsellService upsell) {
+    public ProofCartMcpTools(ProductRepository products, CatalogService catalog, GroqIntentExtractor intents, IntentContractRepository contracts, ProofCartRepository carts, CheckoutOrderRepository orders, ObjectMapper mapper, UpsellService upsell, AgentTokenRepository agentTokens, AgentMandateService mandateService) {
         this.products = products;
         this.catalog = catalog;
         this.intents = intents;
@@ -47,6 +51,8 @@ public class ProofCartMcpTools {
         this.orders = orders;
         this.mapper = mapper;
         this.upsell = upsell;
+        this.agentTokens = agentTokens;
+        this.mandateService = mandateService;
     }
 
     @PostMapping
@@ -60,7 +66,7 @@ public class ProofCartMcpTools {
                 case "search_catalog" -> search(args);
                 case "create_intent_contract" -> createIntent(args, UUID.fromString(auth.getName()));
                 case "evaluate_proof_cart" -> evaluate(args, UUID.fromString(auth.getName()));
-                case "create_checkout_review" -> checkoutReview(args, UUID.fromString(auth.getName()));
+                case "create_checkout_review" -> checkoutReview(args, UUID.fromString(auth.getName()), auth);
                 case "suggest_upsell" -> suggestUpsell(args, UUID.fromString(auth.getName()));
                 case "get_audit_receipt" -> receipt(args, UUID.fromString(auth.getName()));
                 default -> throw new IllegalArgumentException("Unknown tool: " + name);
@@ -115,10 +121,20 @@ public class ProofCartMcpTools {
         return Map.of("cartId", c.getId(), "decision", c.getPolicyDecision(), "checks", mapper.readValue(c.getPolicyChecksJson(), List.class), "approved", c.getApproved(), "offerHash", c.getOfferHash());
     }
 
-    private Object checkoutReview(Map<String, Object> args, UUID buyerId) {
+    private Object checkoutReview(Map<String, Object> args, UUID buyerId, Authentication auth) {
         ProofCartEntity c = ownedCart(args, buyerId);
         if (!"ALLOWED".equals(c.getPolicyDecision())) throw new IllegalArgumentException("Cart is not allowed");
-        return Map.of("cartId", c.getId(), "reviewUrl", "/checkout/" + c.getId(), "requiresBuyerApproval", !Boolean.TRUE.equals(c.getApproved()));
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("cartId", c.getId());
+        result.put("reviewUrl", "/checkout/" + c.getId());
+        result.put("requiresBuyerApproval", !Boolean.TRUE.equals(c.getApproved()));
+        // Let an agent see its own spending mandate against this cart before it tries to
+        // check out, instead of discovering the limit only as a failed request.
+        if (auth.getCredentials() instanceof UUID tokenId) {
+            agentTokens.findById(tokenId).ifPresent(t ->
+                    result.put("mandate", mandateService.describe(t, c.getMerchantId(), c.getTotalPaise())));
+        }
+        return result;
     }
 
     private Object suggestUpsell(Map<String, Object> args, UUID buyerId) throws Exception {

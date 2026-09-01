@@ -43,8 +43,11 @@ public class McpTokenAuthenticationFilter extends OncePerRequestFilter {
 
             var agentToken = agentTokens.authenticate(rawToken);
             if (agentToken.isPresent()) {
+                // Credentials carry the agent token's id (not the raw secret) so downstream code
+                // — spending mandate enforcement, checkout order attribution — knows which
+                // delegated agent authorized the request, without ever re-exposing the token.
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        agentToken.get().getBuyerId().toString(), null, Collections.emptyList());
+                        agentToken.get().getBuyerId().toString(), agentToken.get().getId(), Collections.emptyList());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
                 filterChain.doFilter(request, response);

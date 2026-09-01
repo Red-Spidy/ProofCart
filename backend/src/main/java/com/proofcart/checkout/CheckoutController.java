@@ -7,12 +7,14 @@ import com.proofcart.domain.CartItem;
 import com.proofcart.domain.IntentRules;
 import com.proofcart.domain.PolicyResult;
 import com.proofcart.domain.Product;
+import com.proofcart.domain.entity.AgentTokenEntity;
 import com.proofcart.domain.entity.CheckoutOrderEntity;
 import com.proofcart.domain.entity.IntentContractEntity;
 import com.proofcart.domain.entity.ProductEntity;
 import com.proofcart.domain.entity.ProofCartEntity;
 import com.proofcart.domain.repo.*;
 import com.proofcart.inventory.InventoryReservationService;
+import com.proofcart.mandate.AgentMandateService;
 import com.proofcart.policy.PolicyEngine;
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
@@ -44,6 +46,8 @@ public class CheckoutController {
     private final InventoryReservationService inventory;
     private final InventoryReservationRepository reservations;
     private final AuditEventService audit;
+    private final AgentTokenRepository agentTokens;
+    private final AgentMandateService mandateService;
 
     public CheckoutController(
             ProofCartRepository cartRepo,
@@ -56,7 +60,9 @@ public class CheckoutController {
             InventoryReservationRepository reservations,
             @Value("${razorpay.key.id:}") String keyId,
             @Value("${razorpay.key.secret:}") String keySecret,
-            AuditEventService audit) {
+            AuditEventService audit,
+            AgentTokenRepository agentTokens,
+            AgentMandateService mandateService) {
         this.cartRepo = cartRepo;
         this.productRepo = productRepo;
         this.intentRepo = intentRepo;
@@ -66,6 +72,8 @@ public class CheckoutController {
         this.inventory = inventory;
         this.reservations = reservations;
         this.audit = audit;
+        this.agentTokens = agentTokens;
+        this.mandateService = mandateService;
 
         RazorpayClient client = null;
         try {
@@ -141,6 +149,21 @@ public class CheckoutController {
                 ));
             }
 
+            // All policy checks passed. If an AI agent (not the buyer's own session) is driving
+            // this checkout, its spending mandate must also clear before any order is created.
+            UUID agentTokenId = getAgentTokenId();
+            if (agentTokenId != null) {
+                AgentTokenEntity token = agentTokens.findById(agentTokenId).orElse(null);
+                if (token != null) {
+                    try {
+                        mandateService.enforce(token, cart.getMerchantId(), cart.getTotalPaise());
+                    } catch (AgentMandateService.MandateViolationException e) {
+                        audit.record(cart.getBuyerId(), cart.getMerchantId(), cart.getId(), null, "MANDATE_BLOCKED", e.getMessage());
+                        return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));
+                    }
+                }
+            }
+
             // All checks passed. Create Razorpay order.
             if (razorpayClient == null) {
                 return ResponseEntity.status(503).body(Map.of("error", "Payment gateway not configured. Set RAZORPAY_KEY_ID in environment."));
@@ -159,6 +182,7 @@ public class CheckoutController {
             order.setRazorpayOrderId(rzpOrderId);
             order.setAmountPaise(cart.getTotalPaise());
             order.setStatus("CREATED");
+            order.setAgentTokenId(agentTokenId);
             orderRepo.save(order);
             audit.record(order.getBuyerId(), order.getMerchantId(), order.getCartId(), order.getId(), "CHECKOUT_CREATED", "Razorpay checkout order created.");
 
@@ -188,6 +212,12 @@ public class CheckoutController {
             if ("anonymousUser".equals(principal)) return null;
             return principal;
         }
+        return null;
+    }
+
+    private UUID getAgentTokenId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getCredentials() instanceof UUID id) return id;
         return null;
     }
 }

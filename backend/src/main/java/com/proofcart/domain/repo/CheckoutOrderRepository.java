@@ -4,6 +4,7 @@ import com.proofcart.domain.entity.CheckoutOrderEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,4 +14,5 @@ public interface CheckoutOrderRepository extends JpaRepository<CheckoutOrderEnti
 
     CheckoutOrderEntity findFirstByCartIdAndStatusOrderByCreatedAtDesc(UUID cartId, String status);
     List<CheckoutOrderEntity> findByBuyerIdOrderByCreatedAtDesc(UUID buyerId);
+    List<CheckoutOrderEntity> findByAgentTokenIdAndCreatedAtAfter(UUID agentTokenId, Instant after);
 }

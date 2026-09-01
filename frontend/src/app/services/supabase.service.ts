@@ -68,6 +68,11 @@ export class SupabaseService {
     });
   }
 
+  /** Set a new password — used on the /auth/reset-password landing page from the reset email link */
+  async updatePassword(newPassword: string) {
+    return this.supabase.auth.updateUser({password: newPassword});
+  }
+
   /** Get the current access token (for HTTP interceptor) */
   async getAccessToken(): Promise<string | null> {
     // First try the in-memory session (populated synchronously from localStorage on init)

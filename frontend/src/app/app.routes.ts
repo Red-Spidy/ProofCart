@@ -6,6 +6,7 @@ import {AuditReceiptComponent} from './pages/audit-receipt/audit-receipt';
 import {LoginComponent} from './pages/auth/login/login';
 import {SignupComponent} from './pages/auth/signup/signup';
 import {ForgotPasswordComponent} from './pages/auth/forgot-password/forgot-password';
+import {ResetPasswordComponent} from './pages/auth/reset-password/reset-password';
 import {OrdersComponent} from './pages/orders/orders';
 import {SellerDashboardComponent} from './pages/seller-dashboard/seller-dashboard';
 import {authGuard, guestGuard, sellerGuard} from './guards/auth.guard';
@@ -15,7 +16,11 @@ export const routes: Routes = [
   {path: 'auth/login', component: LoginComponent, canActivate: [guestGuard]},
   {path: 'auth/signup', component: SignupComponent, canActivate: [guestGuard]},
   {path: 'auth/forgot-password', component: ForgotPasswordComponent, canActivate: [guestGuard]},
-  
+  // No guard: reached via the emailed reset link, which carries its own short-lived recovery
+  // session — guestGuard would bounce it away (a session exists) and authGuard is beside the
+  // point (this isn't a normal logged-in visit).
+  {path: 'auth/reset-password', component: ResetPasswordComponent},
+
   // Protected app routes
   {path: '', component: HomeComponent, canActivate: [authGuard]},
   {path: 'orders', component: OrdersComponent, canActivate: [authGuard]},

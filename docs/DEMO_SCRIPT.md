@@ -55,7 +55,7 @@ Show the flow diagram from the README: AI extracts rules → server re-checks li
 
 "That's the audit-trail principle applied to our own build, not just the product: know exactly what broke, why, and prove the fix — same standard we're holding the AI to."
 
-**Optional live bit, if there's time:** open `https://proofcart.onrender.com/api/ops/health` in a browser tab. This is the AI ops watchdog we built after that night — it actually exercises the DB, Redis, Razorpay, and Groq credentials, not just "is the process up," and on a failure it asks Groq to write the same kind of plain-English diagnosis a judge just heard, then opens a GitHub Issue automatically. The exact class of incident from the story above — a credential silently going bad — gets caught and reported on its own now.
+**Optional live bit, if there's time:** open `https://proofcart.onrender.com/swagger-ui.html`, find `Ops → GET /api/ops/health`, and hit "Try it out" / "Execute" live in front of the judges. This is the AI ops watchdog we built after that night — it actually exercises the DB, Redis, Razorpay, and Groq credentials, not just "is the process up," and on a failure it asks Groq to write the same kind of plain-English diagnosis a judge just heard, then opens a GitHub Issue automatically. The exact class of incident from the story above — a credential silently going bad — gets caught and reported on its own now. (The rest of the API — checkout, MCP tools, audit receipts — is browsable from the same Swagger UI if a judge wants to poke at it directly.)
 
 ## Close
 

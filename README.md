@@ -67,6 +67,7 @@ Track 01 asks for money actions that are *"explainable, bounded and gated"* with
 - Supabase JWT auth, Row Level Security, agent spending mandates, tamper-evident audit hash chain, cross-merchant order orchestration, personalized recommendations, upsell suggestions.
 - Redis (Upstash) caching for catalog reads only — never in the authorization path for price, stock, allergens, approval, or payment.
 - **AI ops watchdog** (`GET /api/ops/health`) — the AI agent that watches the AI shopping agent. Actually exercises the DB, Redis, Razorpay, and Groq credentials (not just "is the process up"), and on failure asks Groq to write a plain-English incident summary — the exact "key rotated at 2am" scenario from the incident log below, caught automatically next time instead of by an unlucky judge. Falls back to a deterministic template if Groq itself is the thing that's down. A scheduled GitHub Action (`.github/workflows/keep-alive.yml`) polls it and opens/closes a GitHub Issue, which emails every repo watcher — no new notification service to configure.
+- **Swagger UI** at `/swagger-ui.html` — every REST controller (including the ops watchdog) is browsable and triggerable from the browser, no `curl`/Postman required.
 
 **Frontend** — Angular 21:
 - Auth (signup/login/forgot/reset password), buyer shopping flow (request → cart review → checkout → receipt), order history, seller dashboard for merchants.

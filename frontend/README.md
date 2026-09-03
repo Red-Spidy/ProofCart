@@ -1,6 +1,10 @@
-# Frontend
+# ProofCart — Frontend
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.21.
+Angular 21 client for [ProofCart](../README.md) — the buyer shopping flow (request → cart review → checkout → receipt), auth, order history, and the merchant seller dashboard. Talks to the Spring Boot API in `../backend`.
+
+Live: https://proofcart.vercel.app/auth/signup
+
+Generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.21.
 
 ## Development server
 

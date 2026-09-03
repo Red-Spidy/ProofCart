@@ -1,0 +1,22 @@
+name: Keep Render backend warm
+
+# Render's free tier sleeps the backend after 15 minutes with no traffic, and the resulting
+# cold start (JVM boot + Render's own spin-up) can take up to a minute — bad for a judge
+# clicking the demo link cold. This pings /actuator/health often enough that it never sleeps.
+# It does NOT replace the JVM boot-time fixes (see README "What broke") — those made a cold
+# boot fast; this stops it going cold in the first place during judging.
+#
+# Cron schedules on GitHub Actions are best-effort and can slip during platform load, so this
+# is a safety net, not a guarantee — open the live link yourself a minute before a demo.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend health endpoint
+        run: curl -sf --max-time 90 https://proofcart.onrender.com/actuator/health

@@ -1,36 +1,113 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ProofCart
 
-## Getting Started
+**Safe AI shopping: an AI agent must prove a product matches the buyer's rules before it's allowed to pay.**
 
-First, run the development server:
+Built for the [Razorpay AI Buildathon 2026](https://razorpay.com/buildathon/) — Track 01, AI Growth & Agentic Commerce.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+**Live demo:** https://proofcart.vercel.app/auth/signup
+**Backend health:** https://proofcart.onrender.com/actuator/health
+
+> The backend is on Render's free tier and sleeps after 15 minutes of no traffic. First load after a gap can take 30–60s to wake up — that's not a bug, see [What broke](#what-broke-and-how-we-fixed-it) below. Open the link a minute before you need it.
+
+---
+
+## The problem
+
+AI shopping agents are becoming a real thing — "buy me groceries for dinner" said to an AI assistant. Left unchecked, an agent can pick the wrong product, pay a price that changed after the user last saw it, buy something with an allergen the user excluded, or lock the user into a subscription they never asked for.
+
+ProofCart is the safety layer between "AI wants to buy this" and "money actually moves." An agent may search, reason, and prepare a purchase, but a deterministic policy engine — not the AI — decides whether a payment is allowed, and every decision is recorded.
+
+## How it works
+
+```
+Buyer types a request in plain language
+        │
+        ▼
+AI (Groq / Llama) extracts structured rules: budget, allergens,
+delivery deadline, return requirement, subscription preference
+        │  (falls back to a deterministic regex parser if Groq is down)
+        ▼
+Server re-reads the merchant's live catalog from Postgres
+        │
+        ▼
+Policy engine checks the product against every rule
+        │
+        ├─ ALLOWED             → buyer approves → Razorpay Test Mode checkout
+        ├─ REAPPROVAL_REQUIRED → something changed (e.g. price) but isn't a
+        │                        hard violation → buyer is shown what changed
+        └─ BLOCKED             → hard rule violated (allergen, over budget,
+                                  no return policy) → no checkout is created
+        │
+        ▼
+Every step is written to an append-only audit trail, and the same
+catalog snapshot is re-verified immediately before the Razorpay order
+is created — a price or stock change between "allowed" and "pay" is
+caught, not trusted.
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The AI is only ever allowed to *explain and suggest*. It cannot invent a price, silently swap a product, skip a check, or create a payment. That decision belongs to the policy engine, running server-side, on data re-read from Postgres at the moment of purchase.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Track fit — AI Growth & Agentic Commerce
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Track 01 asks for money actions that are *"explainable, bounded and gated"* with an audit trail and *"one failure handled gracefully."* That's the core of this project, not an add-on:
 
-## Learn More
+- **Bounded** — agent spending mandates: per-transaction cap, daily cap, merchant allow-list.
+- **Gated** — the policy engine is the only thing that can authorize a Razorpay order; the AI has no path to payment that skips it.
+- **Explainable** — every proof-cart carries the rule evaluation that produced its decision.
+- **Audit trail** — append-only `audit_events`, with a tamper-evident hash chain linking each event to the one before it.
+- **Failure handled gracefully** — a merchant price change between cart approval and checkout doesn't fail silently; it's caught by a mandatory re-check and surfaces to the buyer as `REAPPROVAL_REQUIRED`.
 
-To learn more about Next.js, take a look at the following resources:
+## What's implemented
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Backend** — Spring Boot 3 / Java 21:
+- Policy engine with rules for budget, allergens, dietary tags, delivery deadline, returnability, subscription vs. one-time, stock, intent expiry, merchant ownership, and product-version/offer-hash drift.
+- Groq (Llama) intent extraction with a deterministic fallback parser when Groq is unavailable.
+- Razorpay Orders API integration, server-side payment-signature verification, webhook signature verification with event-ID deduplication.
+- MCP server exposing `search_catalog`, `create_intent_contract`, `evaluate_proof_cart`, `create_checkout_review`, and `get_audit_receipt` over authenticated Streamable HTTP — MCP tools can prepare and explain a checkout but never complete one; the signed-in buyer finishes checkout in the UI.
+- Supabase JWT auth, Row Level Security, agent spending mandates, tamper-evident audit hash chain, cross-merchant order orchestration, personalized recommendations, upsell suggestions.
+- Redis (Upstash) caching for catalog reads only — never in the authorization path for price, stock, allergens, approval, or payment.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Frontend** — Angular 21:
+- Auth (signup/login/forgot/reset password), buyer shopping flow (request → cart review → checkout → receipt), order history, seller dashboard for merchants.
 
-## Deploy on Vercel
+**Deployed:** Angular on Vercel, Spring Boot on Render (Docker), Postgres/Auth on Supabase, cache on Upstash Redis.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## What broke (and how we fixed it)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The real incident log, from git history — re-platforming the backend under deadline pressure on Sept 2, 2026:
+
+- **02:02–02:29** — Prod Razorpay key was an empty string in `environment.prod.ts`; checkout would have failed immediately in production. Also, CORS was hardcoded to `localhost:4200`, silently blocking the deployed frontend's origin.
+- **04:08** — The original host (Railway) stopped being free mid-build. Re-platformed to Render, which — unlike Railway's Nixpacks — doesn't auto-detect a plain Maven project, so it needed a Dockerfile that hadn't existed before.
+- **04:26** — Render's deploy hung forever on "waiting for health check." Root cause: Spring Boot Actuator auto-configures a Redis health indicator, which was polling `localhost:6379`, finding nothing, and dragging the whole `/actuator/health` verdict to DOWN — even though the app was fully functional and already treats a down Redis as non-fatal everywhere else in the code. Fixed by telling Actuator to stop factoring Redis into the health verdict.
+- **04:34–04:40** — Cold boot was taking ~47 seconds on Render's fractional-CPU free tier. Fixed with JVM flags (`-XX:TieredStopAtLevel=1` to skip the expensive C2 JIT tier at startup, and pointing `SecureRandom` at `/dev/urandom` so TLS/JWT/JWKS initialization doesn't stall on entropy) plus switching Hibernate from `ddl-auto=update` (diffs the schema on every boot) to `validate` in production, since the schema is already applied via `supabase/migrations/*.sql`.
+
+That got warm-JVM boot down to ~7s. It does **not** eliminate Render's own spin-up-from-sleep delay after 15 minutes idle — that's a platform-level cold start, separate from JVM boot time, and it's the reason the live link can take up to a minute on a cold hit.
+
+## Running locally
+
+**Requirements:** Node.js 20.9+, Java 21, Maven, a Supabase project, a Razorpay Test Mode account, a Groq API key (optional — falls back to a deterministic parser).
+
+```bash
+# Backend
+cd backend
+cp .env.example .env   # fill in Supabase, Razorpay, Groq, MCP pepper
+mvn spring-boot:run    # http://localhost:8080
+
+# Frontend (separate terminal)
+cd frontend
+npm install
+ng serve                # http://localhost:4200
+```
+
+Database schema and seed data (the NutriBasket demo store) are in `supabase/migrations/` and `supabase/seed.sql`.
+
+## Docs
+
+- [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) — the 5-minute judge demo flow.
+- [`docs/MCP_SETUP.md`](docs/MCP_SETUP.md) — connecting an MCP client (e.g. Claude Desktop) to the ProofCart MCP endpoint.
+- [`PROJECT_BRIEF.md`](PROJECT_BRIEF.md) — the plain-language project explanation.
+- [`REQUIREMENTS.md`](REQUIREMENTS.md) — the full v1 build checklist this project was scoped against.
+
+## What we're not building
+
+Real-money payments, a full e-commerce platform, a real bank/UPI integration, autonomous price changes or discounts, or a replacement for Razorpay's own fraud/recovery/reconciliation products. ProofCart is one thing done deliberately: an AI is not trusted to pay just because it can — it has to show what the user asked for, what the merchant actually offered, why the purchase is safe, and when the user approved it.

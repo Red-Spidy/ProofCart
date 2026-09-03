@@ -1,10 +1,18 @@
-name: Keep Render backend warm
+name: Keep Render backend warm + AI ops watchdog
 
-# Render's free tier sleeps the backend after 15 minutes with no traffic, and the resulting
-# cold start (JVM boot + Render's own spin-up) can take up to a minute — bad for a judge
-# clicking the demo link cold. This pings /actuator/health often enough that it never sleeps.
-# It does NOT replace the JVM boot-time fixes (see README "What broke") — those made a cold
-# boot fast; this stops it going cold in the first place during judging.
+# Two jobs on the same schedule:
+#
+# 1. `ping` — Render's free tier sleeps the backend after 15 minutes with no traffic, and the
+#    resulting cold start (JVM boot + Render's own spin-up) can take up to a minute — bad for a
+#    judge clicking the demo link cold. This pings /actuator/health often enough that it never
+#    sleeps. It does NOT replace the JVM boot-time fixes (see README "What broke") — those made
+#    a cold boot fast; this stops it going cold in the first place during judging.
+#
+# 2. `watchdog` — calls /api/ops/health, which actually exercises the DB, Redis, Razorpay, and
+#    Groq credentials (not just "is the process up"). If something's down, it asks Groq to
+#    write a plain-English incident summary and opens a GitHub Issue — which auto-emails every
+#    repo watcher, so the dev team hears about a broken API key the same way a judge finding it
+#    live would, not after the fact. Recovery auto-closes the issue.
 #
 # Cron schedules on GitHub Actions are best-effort and can slip during platform load, so this
 # is a safety net, not a guarantee — open the live link yourself a minute before a demo.
@@ -14,9 +22,46 @@ on:
     - cron: "*/10 * * * *"
   workflow_dispatch: {}
 
+permissions:
+  issues: write
+
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
       - name: Ping backend health endpoint
         run: curl -sf --max-time 90 https://proofcart.onrender.com/actuator/health
+
+  watchdog:
+    runs-on: ubuntu-latest
+    needs: ping
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE_TITLE: "🚨 ProofCart health check failed"
+    steps:
+      - name: Check system health and file/close an incident issue
+        run: |
+          set -euo pipefail
+
+          RESPONSE=$(curl -s --max-time 60 https://proofcart.onrender.com/api/ops/health || true)
+          STATUS=$(echo "$RESPONSE" | jq -r '.status // "unhealthy"' 2>/dev/null || echo "unhealthy")
+
+          EXISTING=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "$ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')
+
+          if [ "$STATUS" = "unhealthy" ]; then
+            DIAGNOSIS=$(echo "$RESPONSE" | jq -r '.diagnosis // "The /api/ops/health endpoint itself did not respond."' 2>/dev/null || echo "The /api/ops/health endpoint itself did not respond.")
+            CHECKS=$(echo "$RESPONSE" | jq -r '.checks[]? | "- **\(.name)**: \(.status) (\(.latencyMs)ms) — \(.detail // "n/a")"' 2>/dev/null || echo "- (no check detail available)")
+            BODY=$(printf '**AI diagnosis:**\n%s\n\n**Checks:**\n%s\n\n_Detected by the ops watchdog at %s._' \
+              "$DIAGNOSIS" "$CHECKS" "$(date -u +%FT%TZ)")
+
+            if [ -z "$EXISTING" ]; then
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$ISSUE_TITLE" --body "$BODY"
+            else
+              gh issue comment "$EXISTING" --repo "$GITHUB_REPOSITORY" --body "$BODY"
+            fi
+          elif [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --repo "$GITHUB_REPOSITORY" \
+              --body "✅ Recovered — all checks passing as of $(date -u +%FT%TZ)."
+            gh issue close "$EXISTING" --repo "$GITHUB_REPOSITORY"
+          fi

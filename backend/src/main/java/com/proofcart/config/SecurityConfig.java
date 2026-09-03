@@ -48,6 +48,8 @@ public class SecurityConfig {
                         .requestMatchers("/h2-console/**").permitAll()
                         // Public: Catalog lookup (no login required to browse products)
                         .requestMatchers("/api/catalog/**").permitAll()
+                        // Public: Ops health/diagnosis (polled by the keep-alive workflow; exposes no secrets)
+                        .requestMatchers("/api/ops/**").permitAll()
                         // Public: Recommendations & Personalization signals
                         .requestMatchers("/api/personalization/**").permitAll()
                         // Public: Intent parsing (entry point of the flow)

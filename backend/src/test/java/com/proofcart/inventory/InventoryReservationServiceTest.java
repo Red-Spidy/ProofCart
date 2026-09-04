@@ -33,7 +33,7 @@ class InventoryReservationServiceTest {
                 new ProductSnapshot(product.getId().toString(), product.getMerchantId().toString(), product.getName(),
                         product.getDescription(), product.getPricePaise(), product.getStockQuantity(), product.getDietaryTags(),
                         product.getAllergens(), product.getDeliveryDays(), product.getReturnable(), product.getSubscriptionAvailable(),
-                        product.getVersion(), null, null));
+                        product.getSubscriptionOnly(), product.getVersion(), null, null));
         UUID orderId = UUID.randomUUID();
 
         inventory.reserve(orderId, List.of(item));

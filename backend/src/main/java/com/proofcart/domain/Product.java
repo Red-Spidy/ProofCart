@@ -14,6 +14,7 @@ public record Product(
         Integer deliveryDays,
         Boolean returnable,
         Boolean subscriptionAvailable,
+        Boolean subscriptionOnly,
         Integer version,
         String updatedAt
 ) {

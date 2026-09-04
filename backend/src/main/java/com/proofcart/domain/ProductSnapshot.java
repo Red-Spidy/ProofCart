@@ -14,6 +14,7 @@ public record ProductSnapshot(
         Integer deliveryDays,
         Boolean returnable,
         Boolean subscriptionAvailable,
+        Boolean subscriptionOnly,
         Integer version,
         String updatedAt,
         String snapshotAt

@@ -59,6 +59,7 @@ public class CatalogController {
                 m.put("deliveryDays", p.getDeliveryDays());
                 m.put("returnable", p.getReturnable());
                 m.put("subscriptionAvailable", p.getSubscriptionAvailable());
+                m.put("subscriptionOnly", p.getSubscriptionOnly());
                 m.put("version", p.getVersion());
                 return m;
             }).toList();

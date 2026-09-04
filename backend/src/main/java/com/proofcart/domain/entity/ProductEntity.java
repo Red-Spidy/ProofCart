@@ -49,6 +49,11 @@ public class ProductEntity {
     @Column(name = "subscription_available", nullable = false)
     private Boolean subscriptionAvailable;
 
+    // True only for products with NO one-time purchase option — a merely subscription-eligible
+    // product (subscriptionAvailable = true) can still be bought once and stays unaffected.
+    @Column(name = "subscription_only", nullable = false, columnDefinition = "boolean default false")
+    private Boolean subscriptionOnly = false;
+
     @Version
     @Column(nullable = false)
     private Integer version;
@@ -156,6 +161,14 @@ public class ProductEntity {
 
     public void setSubscriptionAvailable(Boolean subscriptionAvailable) {
         this.subscriptionAvailable = subscriptionAvailable;
+    }
+
+    public Boolean getSubscriptionOnly() {
+        return subscriptionOnly == null ? false : subscriptionOnly;
+    }
+
+    public void setSubscriptionOnly(Boolean subscriptionOnly) {
+        this.subscriptionOnly = subscriptionOnly;
     }
 
     public Integer getVersion() {

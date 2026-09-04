@@ -153,7 +153,7 @@ public class ProofCartController {
                 ProductSnapshot snap = new ProductSnapshot(
                         liveP.getId().toString(), liveP.getMerchantId().toString(), liveP.getName(), liveP.getDescription(),
                         liveP.getPricePaise(), Math.max(0, liveP.getStockQuantity() - liveP.getReservedQuantity()), liveP.getDietaryTags(), liveP.getAllergens(),
-                        liveP.getDeliveryDays(), liveP.getReturnable(), liveP.getSubscriptionAvailable(), liveP.getVersion(),
+                        liveP.getDeliveryDays(), liveP.getReturnable(), liveP.getSubscriptionAvailable(), liveP.getSubscriptionOnly(), liveP.getVersion(),
                         liveP.getUpdatedAt() != null ? liveP.getUpdatedAt().toString() : null, Instant.now().toString()
                 );
                 int lineTotal = liveP.getPricePaise() * qty;
@@ -276,7 +276,7 @@ public class ProofCartController {
             ProductSnapshot snap = new ProductSnapshot(
                     liveP.getId().toString(), liveP.getMerchantId().toString(), liveP.getName(), liveP.getDescription(),
                     liveP.getPricePaise(), Math.max(0, liveP.getStockQuantity() - liveP.getReservedQuantity()), liveP.getDietaryTags(), liveP.getAllergens(),
-                    liveP.getDeliveryDays(), liveP.getReturnable(), liveP.getSubscriptionAvailable(), liveP.getVersion(),
+                    liveP.getDeliveryDays(), liveP.getReturnable(), liveP.getSubscriptionAvailable(), liveP.getSubscriptionOnly(), liveP.getVersion(),
                     liveP.getUpdatedAt() != null ? liveP.getUpdatedAt().toString() : null, Instant.now().toString()
             );
             int lineTotal = liveP.getPricePaise() * qty;

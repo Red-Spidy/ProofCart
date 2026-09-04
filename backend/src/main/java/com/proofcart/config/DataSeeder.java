@@ -28,6 +28,7 @@ public class DataSeeder implements CommandLineRunner {
     public void run(String... args) throws Exception {
         try {
             jdbcTemplate.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS reserved_quantity INTEGER NOT NULL DEFAULT 0;");
+            jdbcTemplate.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS subscription_only BOOLEAN NOT NULL DEFAULT false;");
             jdbcTemplate.execute("""
                         CREATE TABLE IF NOT EXISTS inventory_reservations (
                             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -41,6 +42,14 @@ public class DataSeeder implements CommandLineRunner {
                     """);
         } catch (Exception e) {
             System.err.println("Schema check/migration notice: " + e.getMessage());
+        }
+
+        // Idempotent, runs every boot (not gated by productRepository.count() == 0 below) so it
+        // also lands on an already-seeded live database, not just a fresh one.
+        try {
+            jdbcTemplate.update("UPDATE products SET subscription_only = true WHERE name = 'Matcha Green Tea Powder'");
+        } catch (Exception e) {
+            System.err.println("subscription_only backfill notice: " + e.getMessage());
         }
 
         try {
@@ -123,6 +132,7 @@ public class DataSeeder implements CommandLineRunner {
             p5.setDeliveryDays(1);
             p5.setReturnable(false);
             p5.setSubscriptionAvailable(true);
+            p5.setSubscriptionOnly(true);
             p5.setVersion(1);
 
             productRepository.saveAll(List.of(p1, p2, p3, p4, p5));

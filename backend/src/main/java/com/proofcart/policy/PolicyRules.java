@@ -147,15 +147,17 @@ public class PolicyRules {
         if (Boolean.TRUE.equals(subscriptionAllowed)) {
             return new PolicyCheck("subscription", true, "Subscription products are allowed.");
         }
-        // When subscriptionAllowed = false, block only items that are subscription-only.
-        // Our current catalog has no subscription-only products, so this always passes.
-        // Adjust the filter below if a `subscriptionOnly` field is added to ProductSnapshot.
         List<String> subscriptionOnlyProducts = items.stream()
-                .filter(i -> Boolean.TRUE.equals(i.snapshot().subscriptionAvailable()) /* && i.snapshot().subscriptionOnly() */)
+                .filter(i -> Boolean.TRUE.equals(i.snapshot().subscriptionOnly()))
                 .map(i -> '"' + i.snapshot().name() + '"')
                 .toList();
-        // For now: pass (no subscription-only products in catalog).
-        return new PolicyCheck("subscription", true, "No subscription-only products in cart.");
+        boolean passed = subscriptionOnlyProducts.isEmpty();
+        return new PolicyCheck(
+                "subscription",
+                passed,
+                passed ? "No subscription-only products in cart."
+                        : "Subscription-only, no one-time option: " + String.join(", ", subscriptionOnlyProducts) + "."
+        );
     }
 
     public static PolicyCheck checkProductVersionDrift(List<CartItem> items, List<Product> liveProducts) {

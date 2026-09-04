@@ -169,7 +169,7 @@ public class MarketOrderController {
                 List<Product> liveProducts = liveEntityList.stream().map(p -> new Product(
                         p.getId().toString(), p.getMerchantId().toString(), p.getName(), p.getDescription(),
                         p.getPricePaise(), p.getStockQuantity(), p.getDietaryTags(), p.getAllergens(), p.getDeliveryDays(),
-                        p.getReturnable(), p.getSubscriptionAvailable(), p.getVersion(),
+                        p.getReturnable(), p.getSubscriptionAvailable(), p.getSubscriptionOnly(), p.getVersion(),
                         p.getUpdatedAt() != null ? p.getUpdatedAt().toString() : null
                 )).toList();
                 List<CartItem> cartItems = objectMapper.readValue(cart.getSnapshotDataJson(), new TypeReference<List<CartItem>>() {

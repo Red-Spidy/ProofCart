@@ -129,7 +129,6 @@ Database schema and seed data (the NutriBasket demo store) are in `supabase/migr
 
 ## Docs
 
-- [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) — the 5-minute judge demo flow.
 - [`docs/POLICY_EVALUATION.md`](docs/POLICY_EVALUATION.md) — batch evaluation of all policy rules, with results and honest caveats.
 - [`docs/MCP_SETUP.md`](docs/MCP_SETUP.md) — connecting an MCP client (e.g. Claude Desktop) to the ProofCart MCP endpoint.
 - [`PROJECT_BRIEF.md`](PROJECT_BRIEF.md) — the plain-language project explanation.

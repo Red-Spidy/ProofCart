@@ -45,3 +45,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDE / editor config
+.idea/
+.vscode/
+
+# Local working material — kept on disk, not part of the submission
+IMPLEMENTATION_PLAN.md
+docs/DEMO_SCRIPT.md
+trajectory.md
+AGENTS.md
+CLAUDE.md

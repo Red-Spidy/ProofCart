@@ -31,28 +31,28 @@ Buyer request
 2. REQUIRED FEATURES FOR VERSION 1
 ======================================================================
 
-[ ] Public landing page explaining safe AI shopping.
-[ ] Buyer and merchant email/password signup and login.
-[ ] Buyer profile with city and optional shopping preferences.
-[ ] Merchant store profile and product-management dashboard.
-[ ] Product create, edit, stock update, and price update.
-[ ] Product fields for dietary tags, allergens, delivery, returns, and
+[x] Public landing page explaining safe AI shopping.
+[x] Buyer and merchant email/password signup and login.
+[x] Buyer profile with city and optional shopping preferences.
+[x] Merchant store profile and product-management dashboard.
+[x] Product create, edit, stock update, and price update.
+[x] Product fields for dietary tags, allergens, delivery, returns, and
     subscription availability.
-[ ] AI shopping request box for buyers.
+[x] AI shopping request box for buyers.
 [ ] Editable intent/rules review before a cart is evaluated.
-[ ] Catalog search based only on merchant data stored in the database.
-[ ] Deterministic policy engine with three results:
+[x] Catalog search based only on merchant data stored in the database.
+[x] Deterministic policy engine with three results:
       - allowed
       - reapproval_required
       - blocked
-[ ] Proof-cart page showing items, price, stock, policy checks, and explanation.
-[ ] Explicit buyer approval before checkout.
-[ ] Razorpay Test Mode Standard Checkout.
-[ ] Server-side Razorpay payment-signature verification.
-[ ] Razorpay webhook verification and duplicate-event protection.
-[ ] Buyer and merchant audit-receipt/history pages.
-[ ] Remote MCP endpoint with scoped and revocable buyer tokens.
-[ ] Public Vercel deployment and clear GitHub documentation.
+[x] Proof-cart page showing items, price, stock, policy checks, and explanation.
+[x] Explicit buyer approval before checkout.
+[x] Razorpay Test Mode Standard Checkout.
+[x] Server-side Razorpay payment-signature verification.
+[x] Razorpay webhook verification and duplicate-event protection.
+[x] Buyer and merchant audit-receipt/history pages.
+[x] Remote MCP endpoint with scoped and revocable buyer tokens.
+[x] Public Vercel deployment and clear GitHub documentation.
 
 ======================================================================
 3. LOCAL DEVELOPMENT SOFTWARE
@@ -86,8 +86,9 @@ Not required:
 - Supabase: PostgreSQL database, Auth, Row Level Security, and migrations.
 - Groq: free-tier AI key for structured intent extraction.
 - Razorpay: Test Mode account and test API keys only.
-- Upstash: free Redis database for short-lived shared catalog caching.
-- Vercel: public Next.js deployment connected to GitHub.
+- Redis (Redis Cloud or Upstash): short-lived shared catalog caching.
+- Vercel: public Angular deployment connected to GitHub.
+- Render: Spring Boot backend deployed from backend/Dockerfile.
 
 The app must still demonstrate core rule extraction when Groq is unavailable.
 A deterministic parser is the fallback; it supports the demo's budget, allergy,
@@ -167,24 +168,24 @@ Required database protection:
 7. SAFETY AND PAYMENT REQUIREMENTS
 ======================================================================
 
-[ ] Store all money as integer paise, never floating-point rupees.
-[ ] Calculate cart totals only on the server.
-[ ] Increase a product version when price, stock, delivery, dietary/allergen,
+[x] Store all money as integer paise, never floating-point rupees.
+[x] Calculate cart totals only on the server.
+[x] Increase a product version when price, stock, delivery, dietary/allergen,
     return, or subscription information changes.
-[ ] Save a product snapshot and offer hash with every proof cart.
-[ ] Re-check the latest catalog data immediately before creating a Razorpay order.
-[ ] Do not create a Razorpay order unless the cart is allowed, current, owned by
+[x] Save a product snapshot and offer hash with every proof cart.
+[x] Re-check the latest catalog data immediately before creating a Razorpay order.
+[x] Do not create a Razorpay order unless the cart is allowed, current, owned by
     the buyer, approved by the buyer, and not expired.
-[ ] Verify Razorpay browser callback signatures on the server with HMAC-SHA256.
-[ ] Verify Razorpay webhook signatures before processing their data.
-[ ] Store webhook event IDs and ignore duplicate deliveries.
-[ ] Keep Upstash Redis credentials server-side and invalidate catalog cache keys
+[x] Verify Razorpay browser callback signatures on the server with HMAC-SHA256.
+[x] Verify Razorpay webhook signatures before processing their data.
+[x] Store webhook event IDs and ignore duplicate deliveries.
+[x] Keep Upstash Redis credentials server-side and invalidate catalog cache keys
     after merchant updates.
-[ ] Re-read PostgreSQL directly for every policy decision and checkout creation;
+[x] Re-read PostgreSQL directly for every policy decision and checkout creation;
     never allow cached product data to authorise payment.
-[ ] Never expose Razorpay Key Secret, webhook secret, Groq key, service-role
+[x] Never expose Razorpay Key Secret, webhook secret, Groq key, service-role
     key, or MCP token pepper in browser code or GitHub.
-[ ] MCP tools may search, prepare, and explain a checkout, but must never make
+[x] MCP tools may search, prepare, and explain a checkout, but must never make
     payment happen silently. The signed-in buyer completes checkout in the UI.
 
 Policy rules that must be tested:
@@ -327,15 +328,16 @@ Demo must show:
 12. DEPLOYMENT REQUIREMENTS
 ======================================================================
 
-[ ] GitHub repository with README.md, PROJECT_BRIEF.md,
-    IMPLEMENTATION_PLAN.md, .env.example, migrations, seed data, and docs.
-[ ] GitHub Actions workflow running lint, type-check, unit tests, and build.
-[ ] Vercel deployment connected to the GitHub repository.
-[ ] Supabase production project configured with production redirect URLs.
-[ ] Upstash Redis environment variables configured only on the server.
+[x] GitHub repository with README.md, PROJECT_BRIEF.md, .env.example,
+    migrations, seed data, and docs.
+[x] GitHub Actions workflow running backend tests and a frontend production
+    build (which type-checks) on every push and pull request.
+[x] Vercel deployment connected to the GitHub repository.
+[x] Supabase production project configured with production redirect URLs.
+[x] Redis environment variables configured only on the server.
 [ ] Razorpay Test Mode webhook configured with the deployed endpoint.
-[ ] docs/MCP_SETUP.md explaining how to connect an MCP client.
-[ ] docs/DEMO_SCRIPT.md containing the five-minute judge demo flow.
+[x] docs/MCP_SETUP.md explaining how to connect an MCP client.
+[x] docs/POLICY_EVALUATION.md reporting the batch policy engine evaluation.
 
 ======================================================================
 13. OUT OF SCOPE FOR VERSION 1

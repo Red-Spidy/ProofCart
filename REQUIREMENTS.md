@@ -157,10 +157,22 @@ Supabase PostgreSQL must contain these tables:
 
 Required database protection:
 
-- Enable Supabase Row Level Security on every application table.
-- Buyers can only see their own contracts, carts, payments, receipts, and MCP
-  tokens.
-- Merchants can only manage their own store, products, and store activity.
+Ownership is enforced in two independent layers. Be precise about which does what,
+because they are not interchangeable:
+
+- Application layer (the one that actually filters per user): every buyer- or
+  merchant-scoped endpoint in Spring Boot resolves the caller from their verified
+  Supabase JWT and compares it against the row's owner before reading or writing.
+  A buyer cannot fetch, approve, check out, or read the receipt of another buyer's
+  cart; merchant routes reject buyers outright.
+- Database layer (defence in depth): Row Level Security is enabled on every
+  application table with no permissive policies, so the public anon key can read
+  nothing at all. The browser uses Supabase only for authentication — never to
+  read application data — so no policy is required for the app to function, and
+  the deny-all posture means a leaked anon key exposes no rows.
+
+Also required:
+
 - Browser code must never use SUPABASE_SERVICE_ROLE_KEY.
 - Include SQL migrations and NutriBasket seed data in the repository.
 
@@ -335,7 +347,7 @@ Demo must show:
 [x] Vercel deployment connected to the GitHub repository.
 [x] Supabase production project configured with production redirect URLs.
 [x] Redis environment variables configured only on the server.
-[ ] Razorpay Test Mode webhook configured with the deployed endpoint.
+[x] Razorpay Test Mode webhook configured with the deployed endpoint.
 [x] docs/MCP_SETUP.md explaining how to connect an MCP client.
 [x] docs/POLICY_EVALUATION.md reporting the batch policy engine evaluation.
 

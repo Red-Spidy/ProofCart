@@ -2,6 +2,10 @@ package com.proofcart.account;
 
 import com.proofcart.domain.entity.Profile;
 import com.proofcart.domain.repo.ProfileRepository;
+import com.proofcart.security.SupabaseJwtAuthenticationFilter;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -15,7 +19,28 @@ public class AccountService {
     }
 
     public Profile get(UUID userId) {
-        return profiles.findById(userId).orElseGet(() -> createBuyerProfile(userId));
+        Profile existing = profiles.findById(userId).orElse(null);
+        if (existing == null) {
+            return createProfile(userId, signupRoleFromToken());
+        }
+        if ("BUYER".equals(existing.getRole()) && "MERCHANT".equals(signupRoleFromToken())) {
+            existing.setRole("MERCHANT");
+            return profiles.save(existing);
+        }
+        return existing;
+    }
+
+    private String signupRoleFromToken() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities() == null) {
+            return null;
+        }
+        return auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(a -> a.startsWith(SupabaseJwtAuthenticationFilter.SIGNUP_ROLE_PREFIX))
+                .map(a -> a.substring(SupabaseJwtAuthenticationFilter.SIGNUP_ROLE_PREFIX.length()))
+                .findFirst()
+                .orElse(null);
     }
 
     public Profile createInitialProfile(UUID userId, String name, String requestedRole) {
@@ -43,11 +68,11 @@ public class AccountService {
         }
     }
 
-    private Profile createBuyerProfile(UUID userId) {
+    private Profile createProfile(UUID userId, String requestedRole) {
         Profile profile = new Profile();
         profile.setId(userId);
         profile.setName("Shopper");
-        profile.setRole("BUYER");
+        profile.setRole(normalizeRole(requestedRole));
         return profiles.save(profile);
     }
 

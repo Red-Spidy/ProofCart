@@ -151,12 +151,15 @@ public class SupabaseJwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
+            List<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + (role != null ? role : "authenticated")));
+            String marketplaceRole = marketplaceRole(claims);
+            if (marketplaceRole != null) {
+                authorities.add(new SimpleGrantedAuthority(SIGNUP_ROLE_PREFIX + marketplaceRole));
+            }
+
             UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            userId,
-                            null,
-                            List.of(new SimpleGrantedAuthority("ROLE_" + (role != null ? role : "authenticated")))
-                    );
+                    new UsernamePasswordAuthenticationToken(userId, null, authorities);
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
@@ -166,6 +169,23 @@ public class SupabaseJwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    public static final String SIGNUP_ROLE_PREFIX = "SIGNUP_ROLE_";
+
+    private String marketplaceRole(Claims claims) {
+        try {
+            Object metadata = claims.get("user_metadata");
+            if (metadata instanceof java.util.Map<?, ?> map) {
+                Object value = map.get("marketplace_role");
+                if (value != null && !value.toString().isBlank()) {
+                    return value.toString().trim().toUpperCase();
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[SupabaseJwt] Could not read marketplace_role: " + e.getMessage());
+        }
+        return null;
     }
 
     private Claims validateAndParseClaims(String token) {

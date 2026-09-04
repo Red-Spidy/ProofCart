@@ -1,6 +1,7 @@
 package com.proofcart.ops;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.proofcart.config.HttpClientTimeouts;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -47,9 +48,13 @@ public class SystemHealthService {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
 
+        // Bounded timeouts matter more here than anywhere else in the app: this check exists to
+        // detect a bad dependency and report it fast (health endpoint response, GitHub issue).
+        // An unreachable-not-erroring host hanging this call defeats that entirely.
         this.razorpayClient = (razorpayKeyId == null || razorpayKeyId.isBlank()) ? null :
                 RestClient.builder()
                         .baseUrl("https://api.razorpay.com/v1")
+                        .requestFactory(HttpClientTimeouts.bounded(5000, 10000))
                         .defaultHeader(HttpHeaders.AUTHORIZATION, "Basic " + Base64.getEncoder()
                                 .encodeToString((razorpayKeyId + ":" + razorpayKeySecret).getBytes()))
                         .build();
@@ -57,6 +62,7 @@ public class SystemHealthService {
         this.groqClient = (groqApiKey == null || groqApiKey.isBlank()) ? null :
                 RestClient.builder()
                         .baseUrl("https://api.groq.com/openai/v1")
+                        .requestFactory(HttpClientTimeouts.bounded(5000, 10000))
                         .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + groqApiKey)
                         .build();
     }

@@ -1,6 +1,7 @@
 package com.proofcart.intent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.proofcart.config.HttpClientTimeouts;
 import com.proofcart.domain.IntentRules;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -52,6 +53,7 @@ public class GroqIntentExtractor {
         if (apiKey != null && !apiKey.isBlank()) {
             this.restClient = RestClient.builder()
                     .baseUrl("https://api.groq.com/openai/v1")
+                    .requestFactory(HttpClientTimeouts.bounded(5000, 10000))
                     .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                     .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                     .build();

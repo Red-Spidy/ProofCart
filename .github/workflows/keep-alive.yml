@@ -14,6 +14,8 @@ name: Keep Render backend warm + AI ops watchdog
 #    repo watcher, so the dev team hears about a broken API key the same way a judge finding it
 #    live would, not after the fact. Recovery auto-closes the issue.
 #
+#    Runs independently of `ping`, not after it — see the note on the job below.
+#
 # Cron schedules on GitHub Actions are best-effort and can slip during platform load, so this
 # is a safety net, not a guarantee — open the live link yourself a minute before a demo.
 
@@ -34,7 +36,11 @@ jobs:
 
   watchdog:
     runs-on: ubuntu-latest
-    needs: ping
+    # Deliberately independent of `ping`, not sequenced after it: the one scenario this job
+    # exists to catch is the backend being down, which is exactly when `ping` also times out
+    # and fails. A `needs: ping` here would skip the watchdog on the exact runs that matter —
+    # confirmed by run #3, where ping hit a slow cold start (curl exit 28, timeout) and the
+    # watchdog never ran at all.
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ISSUE_TITLE: "🚨 ProofCart health check failed"

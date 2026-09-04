@@ -143,8 +143,19 @@ import {IconComponent} from '../../components/icon/icon';
     .page { padding-bottom: 4rem; }
     .recommendations { margin: 1.5rem 0 3rem; }
     .recommendations h2 { margin-bottom: 0.35rem; }
-    .recommendation-card { position: relative; }
-    .recommendation-reason { display: block; color: var(--accent); font-size: 0.75rem; font-weight: 500; margin: 0.75rem 0 0.5rem; }
+    .recommendations .product-grid { row-gap: 2.25rem; }
+    .recommendation-card { display: flex; flex-direction: column; gap: 0.5rem; }
+    .recommendation-card app-product-card { display: block; height: 100%; }
+    .recommendation-reason {
+      display: block;
+      margin: 0;
+      color: var(--accent);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      line-height: 1.3;
+    }
 
     /* ── Hero ──── */
     .hero { text-align: center; padding: 2.5rem 0 2rem; }

@@ -74,13 +74,22 @@ export class LoginComponent {
       // Keep the backend profile in sync for installations where the
       // Supabase signup trigger was not installed yet. Existing profiles are
       // intentionally never overwritten by this endpoint.
+      //
+      // Fire-and-forget on purpose: this must NOT gate the redirect. It calls the
+      // backend, which on free-tier hosting can be cold-starting for up to a minute,
+      // and the request simply hangs while it wakes — no response, no error. Waiting
+      // on it left the user fully authenticated but staring at a stuck "Signing in…"
+      // button, because neither callback fired until the backend came up. Auth is
+      // already complete here; the profile row is a backfill that can land whenever.
       const user = data.user;
       const role = user?.user_metadata?.['marketplace_role'] === 'MERCHANT' ? 'MERCHANT' : 'BUYER';
       const name = user?.user_metadata?.['display_name'] || user?.email || 'Shopper';
       this.marketplace.createProfile(name, role).subscribe({
-        next: () => this.router.navigate(['/']),
-        error: () => this.router.navigate(['/'])
+        error: () => { /* already exists, or the backend is still waking — neither blocks login */ }
       });
+
+      this.loading = false;
+      this.router.navigate(['/']);
     }
   }
 }

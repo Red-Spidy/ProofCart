@@ -9,18 +9,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Batch evaluation of the policy engine across the full rule surface.
- *
- * A demo proves one path works; this measures the whole decision surface at once and prints a
- * scoreboard, so the claim "the engine gates every money action correctly" has a number behind
- * it instead of a screenshot. Every scenario declares the decision it SHOULD produce; any
- * disagreement is printed as an honest exception list and fails the build rather than being
- * quietly tuned to match whatever the engine currently does.
- *
- * Run `mvn -Dtest=PolicyEngineEvaluationTest test` to regenerate the numbers in
- * docs/POLICY_EVALUATION.md.
- */
 class PolicyEngineEvaluationTest {
 
     private final PolicyEngine engine = new PolicyEngine(new ObjectMapper());
@@ -52,8 +40,6 @@ class PolicyEngineEvaluationTest {
         assertTrue(mismatches.isEmpty(),
                 mismatches.size() + " scenario(s) did not produce the expected decision — see the report above.");
     }
-
-    // ── Scenario matrix ──────────────────────────────────────────────────────
 
     private List<Scenario> buildScenarios() {
         List<Scenario> s = new ArrayList<>();
@@ -154,7 +140,6 @@ class PolicyEngineEvaluationTest {
                 input(rules(null, null, null, null, true, null), cart(item(clean(), 1, 10000)), 10000, "merch-OTHER", FUTURE, null, null),
                 PolicyDecision.BLOCKED));
 
-        // Product version drift → re-approval, not a hard block
         ProductSnapshot v1 = clean();
         s.add(new Scenario("DRF-1", "product_version", "Live product version matches snapshot",
                 input(rules(null, null, null, null, true, null), cart(item(v1, 1, 10000)), 10000, MERCHANT, FUTURE,
@@ -169,7 +154,6 @@ class PolicyEngineEvaluationTest {
                         List.of(), null),
                 PolicyDecision.REAPPROVAL_REQUIRED));
 
-        // Offer hash drift → re-approval
         List<CartItem> hashItems = cart(item(clean(), 1, 84000));
         s.add(new Scenario("HSH-1", "offer_hash", "Stored offer hash matches current cart",
                 input(rules(null, null, null, null, true, null), hashItems, 84000, MERCHANT, FUTURE, null,
@@ -180,7 +164,6 @@ class PolicyEngineEvaluationTest {
                         "0000000000000000000000000000000000000000000000000000000000000000"),
                 PolicyDecision.REAPPROVAL_REQUIRED));
 
-        // Precedence & multi-item
         s.add(new Scenario("MIX-1", "precedence", "Hard failure alongside version drift → block wins over re-approval",
                 input(rules(50000, null, null, null, true, null), cart(item(v1, 1, 84000)), 84000, MERCHANT, FUTURE,
                         List.of(liveOf(v1, 2)), null),
@@ -201,8 +184,6 @@ class PolicyEngineEvaluationTest {
 
         return s;
     }
-
-    // ── Reporting ────────────────────────────────────────────────────────────
 
     private void printReport(List<Outcome> outcomes, List<Outcome> mismatches) {
         long correct = outcomes.stream().filter(Outcome::correct).count();
@@ -238,8 +219,6 @@ class PolicyEngineEvaluationTest {
         System.out.println(out);
     }
 
-    // ── Builders ─────────────────────────────────────────────────────────────
-
     private Scenario sc(String id, String rule, String desc, IntentRules rules,
                         List<CartItem> items, int total, PolicyDecision expected) {
         return new Scenario(id, rule, desc, input(rules, items, total, MERCHANT, FUTURE, null, null), expected);
@@ -273,7 +252,6 @@ class PolicyEngineEvaluationTest {
         return new CartItem("prod-2", qty, unitPaise, unitPaise * qty, second);
     }
 
-    /** Baseline product: compliant with everything unless a variant below changes one attribute. */
     private ProductSnapshot clean() {
         return snapshot(List.of("vegan", "gluten-free"), List.of(), 0, true, false, false, 100, 1);
     }

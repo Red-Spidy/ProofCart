@@ -1,13 +1,5 @@
 name: CI
 
-# Backend tests and a frontend production build on every push and PR.
-#
-# Deliberately does NOT run `ng test`: the Angular suite is a bare CLI scaffold with no real
-# specs written yet, and a green check on an empty suite is worse than no check at all. The
-# backend suite is where the actual behaviour lives — including the 43-scenario policy engine
-# evaluation (docs/POLICY_EVALUATION.md), which fails this build if any rule stops producing
-# its expected decision.
-
 on:
   push:
     branches: [main]

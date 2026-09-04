@@ -21,13 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * The AI ops watchdog: checks the things that actually broke on us at 2am (DB, cache, and
- * whether our own Razorpay/Groq keys still work) and, on failure, asks Groq to turn the raw
- * errors into a plain-English incident summary. If Groq itself is one of the failures, falls
- * back to a deterministic template — same AI-with-fallback shape as GroqIntentExtractor /
- * FallbackIntentParser, applied to ops instead of intent parsing.
- */
 @Service
 public class SystemHealthService {
 
@@ -48,9 +41,6 @@ public class SystemHealthService {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
 
-        // Bounded timeouts matter more here than anywhere else in the app: this check exists to
-        // detect a bad dependency and report it fast (health endpoint response, GitHub issue).
-        // An unreachable-not-erroring host hanging this call defeats that entirely.
         this.razorpayClient = (razorpayKeyId == null || razorpayKeyId.isBlank()) ? null :
                 RestClient.builder()
                         .baseUrl("https://api.razorpay.com/v1")
@@ -104,8 +94,6 @@ public class SystemHealthService {
             conn.ping();
             return HealthCheckResult.up("redis", System.currentTimeMillis() - start);
         } catch (Exception e) {
-            // Matches the app's existing philosophy (CatalogCacheService): Redis is a cache
-            // optimisation, never the source of truth, so its absence is degraded, not down.
             return HealthCheckResult.degraded("redis", System.currentTimeMillis() - start, e.getMessage());
         }
     }
@@ -132,8 +120,6 @@ public class SystemHealthService {
             return HealthCheckResult.down("groq", 0, "GROQ_API_KEY not configured");
         }
         try {
-            // /models is a metadata list call — free, no completion tokens spent — but still
-            // exercises the same bearer-token auth path a real intent-extraction call would.
             groqClient.get().uri("/models").retrieve().toBodilessEntity();
             return HealthCheckResult.up("groq", System.currentTimeMillis() - start);
         } catch (RestClientResponseException e) {
@@ -144,8 +130,6 @@ public class SystemHealthService {
         }
     }
 
-    /** 401/403 means the key itself is the problem (e.g. rotated/revoked) — worth saying
-     *  explicitly rather than lumping it in with a generic timeout or 5xx. */
     static String classifyHttpFailure(int statusCode, String service) {
         if (statusCode == 401 || statusCode == 403) {
             return service + " key rejected (HTTP " + statusCode + ") — likely rotated or revoked";
@@ -193,8 +177,6 @@ public class SystemHealthService {
         return fallbackDiagnosis(down);
     }
 
-    /** Deterministic template used when Groq is unavailable (or is itself the failure) —
-     *  mirrors FallbackIntentParser's role for intent extraction. */
     static String fallbackDiagnosis(List<HealthCheckResult> down) {
         String names = down.stream().map(HealthCheckResult::name).collect(Collectors.joining(", "));
         String details = down.stream()

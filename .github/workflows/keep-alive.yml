@@ -1,24 +1,5 @@
 name: Keep Render backend warm + AI ops watchdog
 
-# Two jobs on the same schedule:
-#
-# 1. `ping` — Render's free tier sleeps the backend after 15 minutes with no traffic, and the
-#    resulting cold start (JVM boot + Render's own spin-up) can take up to a minute — bad for a
-#    judge clicking the demo link cold. This pings /actuator/health often enough that it never
-#    sleeps. It does NOT replace the JVM boot-time fixes (see README "What broke") — those made
-#    a cold boot fast; this stops it going cold in the first place during judging.
-#
-# 2. `watchdog` — calls /api/ops/health, which actually exercises the DB, Redis, Razorpay, and
-#    Groq credentials (not just "is the process up"). If something's down, it asks Groq to
-#    write a plain-English incident summary and opens a GitHub Issue — which auto-emails every
-#    repo watcher, so the dev team hears about a broken API key the same way a judge finding it
-#    live would, not after the fact. Recovery auto-closes the issue.
-#
-#    Runs independently of `ping`, not after it — see the note on the job below.
-#
-# Cron schedules on GitHub Actions are best-effort and can slip during platform load, so this
-# is a safety net, not a guarantee — open the live link yourself a minute before a demo.
-
 on:
   schedule:
     - cron: "*/10 * * * *"
@@ -36,11 +17,6 @@ jobs:
 
   watchdog:
     runs-on: ubuntu-latest
-    # Deliberately independent of `ping`, not sequenced after it: the one scenario this job
-    # exists to catch is the backend being down, which is exactly when `ping` also times out
-    # and fails. A `needs: ping` here would skip the watchdog on the exact runs that matter —
-    # confirmed by run #3, where ping hit a slow cold start (curl exit 28, timeout) and the
-    # watchdog never ran at all.
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ISSUE_TITLE: "🚨 ProofCart health check failed"

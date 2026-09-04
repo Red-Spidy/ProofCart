@@ -44,8 +44,6 @@ public class DataSeeder implements CommandLineRunner {
             System.err.println("Schema check/migration notice: " + e.getMessage());
         }
 
-        // Idempotent, runs every boot (not gated by productRepository.count() == 0 below) so it
-        // also lands on an already-seeded live database, not just a fresh one.
         try {
             jdbcTemplate.update("UPDATE products SET subscription_only = true WHERE name = 'Matcha Green Tea Powder'");
         } catch (Exception e) {

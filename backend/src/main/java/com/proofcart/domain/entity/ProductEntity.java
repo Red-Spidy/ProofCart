@@ -49,8 +49,6 @@ public class ProductEntity {
     @Column(name = "subscription_available", nullable = false)
     private Boolean subscriptionAvailable;
 
-    // True only for products with NO one-time purchase option — a merely subscription-eligible
-    // product (subscriptionAvailable = true) can still be bought once and stays unaffected.
     @Column(name = "subscription_only", nullable = false, columnDefinition = "boolean default false")
     private Boolean subscriptionOnly = false;
 

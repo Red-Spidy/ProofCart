@@ -60,22 +60,22 @@ Buyer request
 
 Required:
 
-- Node.js 20.9 or newer (use the current LTS release).
+- Java 21 (Temurin or equivalent) and Maven 3.9+ for the Spring Boot backend.
+- Node.js 20.19 or newer (24.x is what the frontend is built and CI-tested against).
 - npm 10 or newer, included with Node.js.
 - Git 2.40 or newer.
-- A code editor such as VS Code.
+- A code editor such as VS Code or IntelliJ IDEA.
 - A modern browser such as Chrome for Razorpay Test Mode checkout.
 
 Useful command-line tools:
 
-- Supabase CLI for database migrations, seeding, and type generation.
-- Vercel CLI for optional local deployment checks.
-- MCP Inspector for testing the remote MCP endpoint during development.
+- Supabase CLI for database migrations and seeding.
+- Docker, for building the backend image the way Render builds it (backend/Dockerfile).
+- MCP Inspector for testing the MCP endpoint during development.
 
 Not required:
 
 - Python and pip.
-- Docker for the first deployed version.
 - Any real card, UPI, or live Razorpay account.
 
 ======================================================================
@@ -94,58 +94,38 @@ A deterministic parser is the fallback; it supports the demo's budget, allergy,
 delivery, return, and subscription phrases.
 
 ======================================================================
-5. NODE.JS PACKAGES TO INSTALL IN package.json
+5. DEPENDENCIES
 ======================================================================
 
-Production dependencies:
+Backend (backend/pom.xml, Spring Boot 3.3 / Java 21):
 
-- next                     Web app and server API routes.
-- react                    User-interface library.
-- react-dom                Browser rendering for React.
-- @supabase/supabase-js    Supabase database and Auth client.
-- @supabase/ssr            Secure Supabase sessions in Next.js.
-- @upstash/redis           Server-side Upstash Redis cache client.
-- zod                      Shared validation for forms, APIs, AI, and MCP.
-- groq-sdk                 Groq API client for intent extraction.
-- razorpay                 Razorpay server-side Orders API client.
-- @modelcontextprotocol/sdk Remote MCP server and Streamable HTTP support.
-- react-hook-form          Form state for login, product, and intent forms.
-- @hookform/resolvers      Connects react-hook-form to Zod.
-- lucide-react             Icons.
-- clsx                     Conditional CSS class names.
-- class-variance-authority Reusable component variants.
-- tailwind-merge           Safely merges Tailwind CSS classes.
-- sonner                   Toast messages for success and error feedback.
+- spring-boot-starter-web            REST controllers and the MCP JSON-RPC endpoint.
+- spring-boot-starter-security       Filter chain, route authorization, CORS.
+- spring-boot-starter-data-jpa       Entities and repositories over Supabase Postgres.
+- spring-boot-starter-data-redis     Catalog caching (optimisation only, never authoritative).
+- spring-boot-starter-validation     Request payload validation.
+- spring-boot-starter-actuator       /actuator/health for the platform health check.
+- postgresql                         Supabase Postgres driver (runtime).
+- h2                                 In-memory database for tests (runtime).
+- razorpay-java                      Razorpay Orders API client.
+- jjwt-api / jjwt-impl / jjwt-jackson  Supabase JWT verification.
+- springdoc-openapi-starter-webmvc-ui  Swagger UI at /swagger-ui.html.
+- spring-boot-starter-test           JUnit 5 test harness.
+- spring-security-test               Security-aware integration tests.
 
-Development dependencies:
+Use the JDK's built-in MessageDigest for SHA-256 hashing (offer hashes, MCP token
+hashes, audit chain). Do not add a separate crypto library. Groq is called over
+plain RestClient rather than an SDK, so there is no extra AI dependency.
 
-- typescript               Type safety.
-- @types/node              Type definitions for Node.js.
-- @types/react             Type definitions for React.
-- @types/react-dom         Type definitions for React DOM.
-- tailwindcss              Styling system.
-- @tailwindcss/postcss     Tailwind PostCSS integration for Next.js.
-- postcss                  CSS processing required by Tailwind.
-- shadcn                   Component generator; components are copied into the
-                            project instead of imported as one large library.
-- eslint                   Code-quality checks.
-- eslint-config-next       Next.js ESLint rules.
-- prettier                 Consistent formatting.
-- prettier-plugin-tailwindcss Tailwind class-order formatting.
-- vitest                   Fast unit and API tests.
-- jsdom                    Browser-like environment for UI tests.
-- @testing-library/react   React component testing utilities.
-- @testing-library/jest-dom Readable DOM assertions.
-- @testing-library/user-event Realistic user interaction tests.
-- @playwright/test         End-to-end browser tests.
-- @modelcontextprotocol/inspector Optional MCP testing tool.
+Frontend (frontend/package.json, Angular 21):
 
-Use Node's built-in crypto module for HMAC and token hashing. Do not add a
-separate crypto package. Do not add Prisma/Drizzle, Axios, bcrypt, UUID, JWT,
-or an AI payment-decision framework for v1; they are not needed.
+- @angular/core, common, forms, router, platform-browser   Framework.
+- @supabase/supabase-js                                    Auth client and session handling.
+- rxjs, zone.js, tslib                                     Angular runtime dependencies.
+- typescript, @angular/cli, @angular/build                 Build toolchain.
 
-Install only the shadcn/Radix UI component packages actually used by the UI.
-This keeps the first version small and avoids unused dependencies.
+Do not add Prisma/Drizzle, Axios, bcrypt, UUID, or an AI payment-decision
+framework; none are needed. Keep the dependency surface small.
 
 Redis caching rules:
 
@@ -224,23 +204,37 @@ Policy rules that must be tested:
 8. REQUIRED ENVIRONMENT VARIABLES
 ======================================================================
 
-Create .env.local for local secrets and .env.example with names only.
-Configure the same values in Vercel for production.
+Create backend/.env for local secrets and backend/.env.example with names only.
+Configure the same values as environment variables on Render for production.
 
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
+Backend (server-side only, never exposed to the browser):
+
+SPRING_DATASOURCE_URL          Supabase Postgres JDBC URL
+SPRING_DATASOURCE_USERNAME
+SPRING_DATASOURCE_PASSWORD
+SUPABASE_URL                   Used to fetch JWKS for JWT verification
+SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
+SUPABASE_JWT_SECRET
 GROQ_API_KEY
-NEXT_PUBLIC_RAZORPAY_KEY_ID
+RAZORPAY_KEY_ID
 RAZORPAY_KEY_SECRET
 RAZORPAY_WEBHOOK_SECRET
-MCP_TOKEN_PEPPER
-UPSTASH_REDIS_REST_URL
-UPSTASH_REDIS_REST_TOKEN
-NEXT_PUBLIC_APP_URL
+MCP_TOKEN_PEPPER               Salt for hashing MCP agent tokens
+MCP_VALID_TOKEN_HASH           SHA-256 of pepper:token for the static service token
+REDIS_HOST / REDIS_PORT / REDIS_USERNAME / REDIS_PASSWORD / REDIS_SSL
+CORS_ALLOWED_ORIGINS           Comma-separated; local and prod origins can coexist
+JPA_DDL_AUTO                   'validate' in production, 'update' locally
+PORT                           Injected by Render at runtime
 
-Only variables beginning with NEXT_PUBLIC_ may be sent to the browser. The
-Razorpay Key ID is safe to expose; its Key Secret is not.
+Frontend (frontend/src/environments/environment*.ts):
+
+supabaseUrl, supabaseAnonKey   Public by design (protected by Row Level Security)
+razorpayKeyId                  Public client-side key — the Key Secret is NOT
+
+The Razorpay Key ID and Supabase anon key are safe to ship to the browser. The
+Key Secret, webhook secret, service-role key, JWT secret, Groq key, and MCP
+pepper must never reach client code or the repository.
 
 ======================================================================
 9. REQUIRED API ROUTES

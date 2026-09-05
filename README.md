@@ -7,7 +7,7 @@ Built for the [Razorpay AI Buildathon 2026](https://razorpay.com/buildathon/) �
 **Live demo:** https://proofcart.vercel.app/auth/signup
 **Backend health:** https://proofcart.onrender.com/actuator/health
 
-> The backend is on Render's free tier and sleeps after 15 minutes of no traffic. First load after a gap can take 30–60s to wake up — that's not a bug, see [What broke](#what-broke-and-how-we-fixed-it) below. Open the link a minute before you need it.
+> The backend is on Render's free tier and sleeps after 15 minutes of no traffic. First load after a gap can take up to 90s to wake up — that's not a bug, see [What broke](#what-broke-and-how-we-fixed-it) below. Open the link a couple of minutes before you need it.
 
 ---
 
@@ -107,7 +107,7 @@ The real incident log, from git history — re-platforming the backend under dea
 - **04:26** — Render's deploy hung forever on "waiting for health check." Root cause: Spring Boot Actuator auto-configures a Redis health indicator, which was polling `localhost:6379`, finding nothing, and dragging the whole `/actuator/health` verdict to DOWN — even though the app was fully functional and already treats a down Redis as non-fatal everywhere else in the code. Fixed by telling Actuator to stop factoring Redis into the health verdict.
 - **04:34–04:40** — Cold boot was taking ~47 seconds on Render's fractional-CPU free tier. Fixed with JVM flags (`-XX:TieredStopAtLevel=1` to skip the expensive C2 JIT tier at startup, and pointing `SecureRandom` at `/dev/urandom` so TLS/JWT/JWKS initialization doesn't stall on entropy) plus switching Hibernate from `ddl-auto=update` (diffs the schema on every boot) to `validate` in production, since the schema is already applied via `supabase/migrations/*.sql`.
 
-That got warm-JVM boot down to ~7s. It does **not** eliminate Render's own spin-up-from-sleep delay after 15 minutes idle — that's a platform-level cold start, separate from JVM boot time, and it's the reason the live link can take up to a minute on a cold hit.
+That got warm-JVM boot down to ~7s. It does **not** eliminate Render's own spin-up-from-sleep delay after 15 minutes idle — that's a platform-level cold start, separate from JVM boot time, and it's the reason the live link can take up to 90 seconds on a cold hit.
 
 ## Running locally
 
